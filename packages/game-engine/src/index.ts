@@ -1,5 +1,5 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS } from '@wonderland/shared';
-import type { LobbyAction, LobbyState, LobbyStateV1, LobbyView, Reply } from '@wonderland/shared';
+import type { LobbyAction, LobbyState, LobbyStateV1, LobbyStateV2, LobbyView, Reply } from '@wonderland/shared';
 
 export * from './battle.ts';
 export * from './game.ts';
@@ -8,22 +8,38 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 2, code, hostId: host.id, revision: 1, players: [{ ...host, ready: false, faction: null }],
+    version: 3, code, hostId: host.id, revision: 1, firstPlayerId: null,
+    players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
   };
 }
 
-function advance(state: LobbyState, event: LobbyState['journal'][number]): LobbyState {
-  return { ...state, revision: event.revision, journal: [...state.journal, event].slice(-JOURNAL_LIMIT) };
+function appendEvent<Event extends LobbyState['journal'][number]>(journal: Event[], event: NoInfer<Event>) {
+  return { revision: event.revision, journal: [...journal, event].slice(-JOURNAL_LIMIT) };
 }
 
-export function migrateLobbyV1(old: LobbyStateV1): LobbyState {
-  return advance({
+function advance(state: LobbyState, event: LobbyState['journal'][number]): LobbyState {
+  return { ...state, ...appendEvent(state.journal, event) };
+}
+
+export function migrateLobbyV1(old: LobbyStateV1): LobbyStateV2 {
+  return {
     ...old, version: 2,
     players: old.players.map((player) => ({ ...player, ready: false, faction: null })),
-  }, {
-    revision: old.revision + 1, type: 'factions-enabled', resetReadyCount: old.players.filter((p) => p.ready).length,
-  });
+    ...appendEvent<LobbyStateV2['journal'][number]>(old.journal, {
+      revision: old.revision + 1, type: 'factions-enabled', resetReadyCount: old.players.filter((p) => p.ready).length,
+    }),
+  };
+}
+
+export function migrateLobbyV2(old: LobbyStateV2): LobbyState {
+  return { ...old, version: 3, firstPlayerId: null };
+}
+
+/** Restore before projecting, or call after a future roster removal and before committing it. */
+export function normalizeFirstPlayer(state: LobbyState): LobbyState {
+  if (state.firstPlayerId === null || state.players.some(({ id }) => id === state.firstPlayerId)) return state;
+  return advance({ ...state, firstPlayerId: null }, { revision: state.revision + 1, type: 'first-player-cleared' });
 }
 
 export function joinLobby(state: LobbyState, player: NewPlayer): Reply<LobbyState> {
@@ -37,6 +53,15 @@ export function applyLobbyAction(state: LobbyState, actorId: string, action: Lob
   const player = state.players.find(({ id }) => id === actorId);
   if (!player) return { ok: false, error: 'unauthorized' };
   const revision = state.revision + 1;
+  if (action.type === 'select-first-player') {
+    // WW-SETUP-005 — the host records the table's choice; the server never picks a default.
+    if (actorId !== state.hostId) return { ok: false, error: 'host-required' };
+    const { firstPlayerId } = action;
+    if (!state.players.some(({ id }) => id === firstPlayerId)) return { ok: false, error: 'seat-not-found' };
+    if (state.firstPlayerId === firstPlayerId) return { ok: true, value: state };
+    if (action.expectedRevision !== state.revision) return { ok: false, error: 'conflict' };
+    return { ok: true, value: advance({ ...state, firstPlayerId }, { revision, type: action.type, actorId, firstPlayerId }) };
+  }
   if (action.type === 'select-faction') {
     if (player.faction === action.faction) return { ok: true, value: state };
     // WW-SETUP-002 — one lot per faction. Check against the current state under the write lock.
@@ -58,6 +83,7 @@ export function applyLobbyAction(state: LobbyState, actorId: string, action: Lob
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
   return {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
+    firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: playerId === state.hostId,
     players: state.players.map(({ id, name, ready, faction }) => ({ id, name, ready, faction })),
     canSetReady: state.players.some(({ id, faction }) => id === playerId && faction !== null),
     factions: FACTION_IDS.map((id) => {

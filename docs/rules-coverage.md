@@ -8,7 +8,7 @@ Référentiel : [`rules.md`](../rules.md). Les pages renvoient au livret FR du j
 | Factions au départ | [`WW-SETUP-002`](../rules.md#ww-setup-002--choix-des-factions) | p. 5 A et inventaire p. 2–3 pour l'exclusivité ; p. 8, 10–11, 21 pour la recette de préparation | Documentée | Exclusivité en salon ([#5](https://github.com/FlowHartigan/alice_wonder/issues/5)) ; pas de mise en place | [Intégration et navigateur](#recette-du-choix-de-faction-en-salon) | Validée : choix exclusif pour #5 ; face et dotations A documentées en #2, pas les fiches des plateaux |
 | Ressources initiales | [`WW-SETUP-003`](../rules.md#ww-setup-003--ressources-individuelles-et-quêtes) | p. 3, 5 B–M, 21 ; décompter sacs et pistes, suivre une Quête refusée, contrôler l'enchaînement B–M | Documentée | — | — | Validée : opérations établies B–M ; ordre entre joueurs à J et mains de Pari après K à 3–4J non validés |
 | Plateau | [`WW-SETUP-004`](../rules.md#ww-setup-004--plateau-et-réserves-communes) | p. 2–5, 8–9, 21 et plateau FR ; vérifier marché mixte, chaises et Premier combat | Documentée | — | — | Validée : préparation commune et exception régionale ; ordre du filtrage du marché 2J non validé |
-| Initiative et Éclats | [`WW-SETUP-005`](../rules.md#ww-setup-005--initiative-et-éclats-du-round-i) | p. 3, 5 N (tableau visuel), 6, 11 ; [décision hôte](decisions.md#décisions) ; simuler J1 non hôte après M | Documentée | — | — | Validée : round I, hors absence d'accord ; pas de validation de l'initiative des rounds suivants |
+| Initiative et Éclats | [`WW-SETUP-005`](../rules.md#ww-setup-005--initiative-et-éclats-du-round-i) | p. 3, 5 N (critère et tableau visuel), 6, 11 ; [décision hôte](decisions.md#décisions) | Documentée | Désignation de J1 seule ([#6](https://github.com/FlowHartigan/alice_wonder/issues/6)) ; ni lancement, ni ordre des tours, ni Éclats | [Métier, intégration et navigateurs](#recette-de-la-désignation-de-j1-en-salon) | Validée : round I, sans départage en cas d'absence d'accord ; pas de validation de l'initiative des rounds suivants |
 | Structure générale | `WW-FLOW-001` | p. 6, 15 | Documenté | — | — | — |
 | Transitions | `WW-FLOW-002` à `003` | p. 6–7, 15, 21 ; caler l'ordre et les cas de régions écartées | Partiel · À documenter | — | — | — |
 | Thé | `WW-TEA-001` à `006` | p. 6–11, 21–22 ; lister les effets, décisions et exceptions | Partiel · À documenter | — | — | — |
@@ -31,6 +31,11 @@ Le statut prêt, le changement de choix et l'arbitrage des demandes réseau sont
 
 - [`tests/lobby.test.ts`](../tests/lobby.test.ts) : deux demandes concurrentes à la même révision, un seul succès, refus explicite et disponibilité diffusée ; cinq sièges avec cinq factions ; choix réservé à son siège, prêt sans faction refusé, changement et libération, sélection identique et rejeu, reprise après reconnexion et redémarrage, migration v1 et annulation si un snapshot est illisible.
 - [`tests/lobby.e2e.ts`](../tests/lobby.e2e.ts) : invitation Chromium → Firefox, cinq noms FR et disponibilités accessibles, sélection au clavier, synchronisation du statut et du journal, changement et réattribution, reprise de la même place au rechargement.
+
+## Recette de la désignation de J1 en salon
+
+- [`tests/lobby.test.ts`](../tests/lobby.test.ts) : absence initiale, choix réservé à l'hôte, siège inconnu refusé, validation stricte du message, conflit de révision et rejeu sans réappliquer l'ancien choix. Diffusion à cinq sièges, reconnexion et réouverture SQLite ; snapshot orphelin normalisé et sauvegardé sans remplaçant. Migration v1 avec la convention de #5, et migration v2 avec conservation des factions, des prêts, des accès et des actions acceptées.
+- [`tests/lobby.e2e.ts`](../tests/lobby.e2e.ts) : Chromium (hôte) choisit l'invité Firefox au clavier ; les deux voient le rappel du thé, l'absence initiale puis le même choix après rechargement. Aucun contrôle de désignation côté invité. Les changements de faction et de statut n'effacent pas J1.
 
 ## Recette documentaire de la mise en place
 

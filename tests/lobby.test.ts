@@ -8,7 +8,7 @@ import { afterEach, expect, it } from 'vitest';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { makeServer } from '../apps/server/src/server.ts';
-import { applyLobbyAction, createLobby, joinLobby } from '@wonderland/game-engine';
+import { applyLobbyAction, createLobby, joinLobby, normalizeFirstPlayer } from '@wonderland/game-engine';
 import { FACTION_IDS, lobbyState } from '@wonderland/shared';
 import type { ClientEvents, FactionId, LobbyView, Reply, ServerEvents } from '@wonderland/shared';
 
@@ -53,6 +53,8 @@ const selectFaction = (faction: FactionId, expectedRevision: number) =>
   ({ actionId: randomUUID(), type: 'select-faction', faction, expectedRevision } as const);
 const setReady = (ready: boolean, expectedRevision: number) =>
   ({ actionId: randomUUID(), type: 'set-ready', ready, expectedRevision } as const);
+const selectFirstPlayer = (firstPlayerId: string, expectedRevision: number) =>
+  ({ actionId: randomUUID(), type: 'select-first-player', firstPlayerId, expectedRevision } as const);
 const ownSeat = (view: LobbyView) => view.players.find((p) => p.id === view.you);
 const available = (view: LobbyView) => view.factions.filter((f) => f.status === 'available').map((f) => f.id);
 
@@ -61,10 +63,14 @@ function tempDatabase() {
   return join(directory, 'test.sqlite');
 }
 
-afterEach(async () => {
-  for (const socket of clients.splice(0)) socket.disconnect();
+async function stop() {
   await server?.close();
   server = undefined;
+}
+
+afterEach(async () => {
+  for (const socket of clients.splice(0)) socket.disconnect();
+  await stop();
   if (directory) rmSync(directory, { recursive: true, force: true });
   directory = undefined;
 });
@@ -89,6 +95,42 @@ it('refuse à la restauration les factions dupliquées et les sièges prêts san
   expect(lobbyState.safeParse({ ...joined, players: joined.players.map((p) => ({ ...p, faction: 'alice' })) }).success).toBe(false);
 });
 
+it('WW-SETUP-005 : seul l’hôte désigne un siège, y compris le sien, sans changer les joueurs', () => {
+  const host = { id: randomUUID(), name: 'Alice' };
+  const guest = { id: randomUUID(), name: 'Dinah' };
+  const created = createLobby('12345678', host);
+  const state = success(joinLobby(created, guest));
+  expect(created.firstPlayerId).toBeNull();
+  expect(state.firstPlayerId).toBeNull();
+  const action = selectFirstPlayer(guest.id, state.revision);
+  expect(applyLobbyAction(state, randomUUID(), action)).toEqual({ ok: false, error: 'unauthorized' });
+  expect(applyLobbyAction(state, guest.id, action)).toEqual({ ok: false, error: 'host-required' });
+  expect(applyLobbyAction(state, host.id, { ...action, firstPlayerId: randomUUID() })).toEqual({ ok: false, error: 'seat-not-found' });
+  expect(applyLobbyAction(state, host.id, { ...action, expectedRevision: created.revision })).toEqual({ ok: false, error: 'conflict' });
+  const picked = success(applyLobbyAction(state, host.id, action));
+  expect(picked).toMatchObject({ firstPlayerId: guest.id, revision: state.revision + 1, players: state.players });
+  expect(success(applyLobbyAction(picked, host.id, action))).toBe(picked);
+  expect(applyLobbyAction(picked, guest.id, action)).toEqual({ ok: false, error: 'host-required' });
+  expect(success(applyLobbyAction(picked, host.id, selectFirstPlayer(host.id, picked.revision))).firstPlayerId).toBe(host.id);
+});
+
+it('normalise uniquement la référence vers un siège absent, de façon idempotente', () => {
+  const host = { id: randomUUID(), name: 'Alice' };
+  const guest = { id: randomUUID(), name: 'Dinah' };
+  const state = success(joinLobby(createLobby('12345678', host), guest));
+  const selected = success(applyLobbyAction(state, host.id, selectFirstPlayer(guest.id, state.revision)));
+  expect(normalizeFirstPlayer(state)).toBe(state);
+  expect(normalizeFirstPlayer(selected)).toBe(selected);
+  const dangling = { ...selected, players: selected.players.filter(({ id }) => id !== guest.id) };
+  expect(lobbyState.safeParse(dangling).success).toBe(false);
+  const normalized = normalizeFirstPlayer(dangling);
+  const event = { revision: selected.revision + 1, type: 'first-player-cleared' };
+  expect(lobbyState.parse(normalized)).toEqual({
+    ...dangling, firstPlayerId: null, revision: event.revision, journal: [...selected.journal, event],
+  });
+  expect(normalizeFirstPlayer(normalized)).toBe(normalized);
+});
+
 it('synchronise cinq factions uniques et garde les jetons de session hors des vues', async () => {
   const url = await start();
   const host = await connect(url);
@@ -97,7 +139,7 @@ it('synchronise cinq factions uniques et garde les jetons de session hors des vu
   const guest = await connect(url);
   const receivedJoin = nextUpdate(host);
   const joined = success(await guest.emitWithAck('lobby:join', { code, name: 'Dinah' }));
-  expect(await receivedJoin).toEqual({ ...joined.view, you: created.view.you });
+  expect(await receivedJoin).toEqual({ ...joined.view, you: created.view.you, canSelectFirstPlayer: true });
   expect(joined.view.hostId).toBe(created.view.you);
   expect(joined.view.you).not.toBe(created.view.you);
   expect(JSON.stringify(joined.view)).not.toContain(token);
@@ -138,6 +180,55 @@ it('synchronise cinq factions uniques et garde les jetons de session hors des vu
   const lastFaction = FACTION_IDS.at(-1)!;
   expect(await last.emitWithAck('lobby:action', selectFaction('alice', changed.revision))).toEqual({ ok: false, error: 'faction-taken' });
   expect(success(await last.emitWithAck('lobby:action', selectFaction(lastFaction, changed.revision)))).toEqual(changed);
+  expect(changed.firstPlayerId).toBeNull();
+  const firstPlayerUpdates = Promise.all(seated.map(nextUpdate));
+  const picked = success(await host.emitWithAck('lobby:action', selectFirstPlayer(joined.view.you, changed.revision)));
+  for (const view of await firstPlayerUpdates) {
+    expect(view).toMatchObject({ firstPlayerId: joined.view.you, revision: changed.revision + 1, players: changed.players });
+    expect(view.canSelectFirstPlayer).toBe(view.you === created.view.you);
+  }
+  expect(picked.journal.at(-1)).toMatchObject({ type: 'select-first-player', firstPlayerId: joined.view.you });
+});
+
+it('valide la désignation sur le réseau, la synchronise et ne réapplique pas un ancien choix', async () => {
+  const database = tempDatabase();
+  const url = await start(database);
+  const [host, guest, outsider] = await Promise.all([connect(url), connect(url), connect(url)]);
+  const { session, view } = success(await host.emitWithAck('lobby:create', { name: 'Hôte' }));
+  const joined = success(await guest.emitWithAck('lobby:join', { code: session.code, name: 'Dinah' }));
+  expect(view).toMatchObject({ firstPlayerId: null, canSelectFirstPlayer: true });
+  expect(joined.view).toMatchObject({ firstPlayerId: null, canSelectFirstPlayer: false });
+  const choice = selectFirstPlayer(joined.view.you, joined.view.revision);
+  expect(await outsider.emitWithAck('lobby:action', choice)).toEqual({ ok: false, error: 'unauthorized' });
+  expect(await guest.emitWithAck('lobby:action', choice)).toEqual({ ok: false, error: 'host-required' });
+  expect(await guest.emitWithAck('lobby:action', { ...choice, actorId: view.you } as typeof choice)).toEqual({ ok: false, error: 'invalid' });
+  expect(await host.emitWithAck('lobby:action', { ...choice, firstPlayerId: 'invalide' })).toEqual({ ok: false, error: 'invalid' });
+  expect(await host.emitWithAck('lobby:action', { ...choice, firstPlayerId: randomUUID() })).toEqual({ ok: false, error: 'seat-not-found' });
+  expect(await host.emitWithAck('lobby:action', { ...choice, expectedRevision: view.revision })).toEqual({ ok: false, error: 'conflict' });
+  expect(success(await guest.emitWithAck('lobby:resume', joined.session))).toEqual(joined.view);
+  const update = nextUpdate(guest);
+  const selected = success(await host.emitWithAck('lobby:action', choice));
+  expect(await update).toEqual({ ...selected, you: joined.view.you, canSelectFirstPlayer: false });
+  expect(selected.revision).toBe(choice.expectedRevision + 1);
+  expect(success(await host.emitWithAck('lobby:action', choice))).toEqual(selected);
+  expect(success(await host.emitWithAck('lobby:action', selectFirstPlayer(choice.firstPlayerId, choice.expectedRevision)))).toEqual(selected);
+  expect(await host.emitWithAck('lobby:action', { ...choice, firstPlayerId: view.you })).toEqual({ ok: false, error: 'conflict' });
+
+  guest.disconnect();
+  const reconnected = await connect(url);
+  expect(success(await reconnected.emitWithAck('lobby:resume', joined.session)).firstPlayerId).toBe(joined.view.you);
+  const selfChoice = selectFirstPlayer(view.you, selected.revision);
+  const switched = success(await host.emitWithAck('lobby:action', selfChoice));
+  expect(switched.firstPlayerId).toBe(view.you);
+  expect(success(await host.emitWithAck('lobby:action', choice))).toEqual(switched);
+  const finalChoice = success(await host.emitWithAck('lobby:action', selectFirstPlayer(joined.view.you, switched.revision)));
+  await stop();
+  const restoredUrl = await start(database);
+  const [hostReturned, guestReturned] = await Promise.all([connect(restoredUrl), connect(restoredUrl)]);
+  expect(success(await hostReturned.emitWithAck('lobby:resume', session))).toEqual(finalChoice);
+  expect(success(await guestReturned.emitWithAck('lobby:resume', joined.session)))
+    .toEqual({ ...finalChoice, you: joined.view.you, canSelectFirstPlayer: false });
+  expect(success(await hostReturned.emitWithAck('lobby:action', selfChoice))).toEqual(finalChoice);
 });
 
 it('arbitre deux demandes simultanées, libère la faction au changement et conserve la place à la reconnexion', async () => {
@@ -204,8 +295,7 @@ it('conserve la place, la faction, le statut et l’idempotence après réouvert
   const action = setReady(true, picked.revision);
   const ready = success(await host.emitWithAck('lobby:action', action));
   host.disconnect();
-  await server?.close();
-  server = undefined;
+  await stop();
 
   const returned = await connect(await start(database));
   expect(success(await returned.emitWithAck('lobby:resume', session))).toEqual(ready);
@@ -261,7 +351,7 @@ it('migre un snapshot v1 sans perdre l’accès, et ne réapplique jamais un anc
   const joined = success(await guest.emitWithAck('lobby:resume', guestSession));
   expect(joined.you).toBe(snapshot.players[1].id);
   expect(migrated).toMatchObject({
-    code: snapshot.code, hostId: snapshot.hostId, you: snapshot.hostId, revision: 4, canSetReady: false,
+    code: snapshot.code, hostId: snapshot.hostId, you: snapshot.hostId, revision: 4, canSetReady: false, firstPlayerId: null,
     players: snapshot.players.map((p) => ({ ...p, ready: false, faction: null })),
     journal: [...snapshot.journal, { revision: 4, type: 'factions-enabled', resetReadyCount: 1 }],
   });
@@ -276,11 +366,95 @@ it('migre un snapshot v1 sans perdre l’accès, et ne réapplique jamais un anc
   expect(success(await host.emitWithAck('lobby:action', ready))).toEqual(picked);
   expect(await host.emitWithAck('lobby:action', setReady(true, 3))).toEqual({ ok: false, error: 'conflict' });
   expect(ownSeat(picked)?.ready).toBe(false);
-  await server?.close();
-  server = undefined;
+  await stop();
   const returned = await connect(await start(database));
   expect(success(await returned.emitWithAck('lobby:resume', hostSession))).toEqual(picked);
   expect(success(await returned.emitWithAck('lobby:action', ready))).toEqual(picked);
+});
+
+it('migre un salon v2 de #5 sans changer ses factions, prêts, sièges, secrets, révision ou succès', async () => {
+  const database = tempDatabase();
+  const { snapshot: v1, ready: legacyReady, hostSession, guestSession } = seedV1(database);
+  const [host, guest] = v1.players;
+  const faction = selectFaction('alice', 4);
+  const ready = setReady(true, 5);
+  const guestFaction = selectFaction('chapelier-fou', 6);
+  const snapshot = {
+    ...v1, version: 2, revision: 7,
+    players: [{ ...host, faction: faction.faction }, { ...guest, faction: guestFaction.faction }],
+    journal: [...v1.journal,
+      { revision: 4, type: 'factions-enabled', resetReadyCount: 1 },
+      { revision: 5, type: faction.type, actorId: host.id, faction: faction.faction, previousFaction: null, wasReady: false },
+      { revision: 6, type: ready.type, actorId: host.id, ready: true },
+      { revision: 7, type: guestFaction.type, actorId: guest.id, faction: guestFaction.faction, previousFaction: null, wasReady: false },
+    ],
+  };
+  const db = new DatabaseSync(database);
+  try {
+    // Seed a snapshot and accepted intents in the format of #5, without the new migrator.
+    db.prepare('UPDATE lobbies SET snapshot = ?').run(JSON.stringify(snapshot));
+    const receipt = db.prepare('INSERT INTO accepted_actions VALUES (?, ?, ?, ?)');
+    receipt.run(snapshot.code, host.id, faction.actionId, 'select-faction:alice:4');
+    receipt.run(snapshot.code, host.id, ready.actionId, 'set-ready:true:5');
+    receipt.run(snapshot.code, guest.id, guestFaction.actionId, 'select-faction:chapelier-fou:6');
+    db.exec('PRAGMA user_version = 2');
+    const sessions = db.prepare('SELECT * FROM sessions ORDER BY player_id');
+    const intents = db.prepare('SELECT * FROM accepted_actions ORDER BY player_id, action_id');
+    const before = { sessions: sessions.all(), intents: intents.all() };
+
+    const url = await start(database);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(3);
+    expect(JSON.parse(String(db.prepare('SELECT snapshot FROM lobbies').get()?.snapshot)))
+      .toEqual({ ...snapshot, version: 3, firstPlayerId: null });
+    expect({ sessions: sessions.all(), intents: intents.all() }).toEqual(before);
+    const [h, g] = await Promise.all([connect(url), connect(url)]);
+    const hostView = success(await h.emitWithAck('lobby:resume', hostSession));
+    const guestView = success(await g.emitWithAck('lobby:resume', guestSession));
+    expect(hostView).toMatchObject({ you: host.id, hostId: host.id, players: snapshot.players, firstPlayerId: null, revision: 7 });
+    expect(guestView).toMatchObject({ you: guest.id, players: snapshot.players, firstPlayerId: null, revision: 7 });
+    for (const replay of [legacyReady, faction, ready]) {
+      expect(success(await h.emitWithAck('lobby:action', replay))).toEqual(hostView);
+    }
+    expect(success(await g.emitWithAck('lobby:action', guestFaction))).toEqual(guestView);
+    const choice = selectFirstPlayer(guest.id, hostView.revision);
+    const update = nextUpdate(g);
+    const selected = success(await h.emitWithAck('lobby:action', choice));
+    expect(selected).toMatchObject({ players: snapshot.players, firstPlayerId: guest.id, revision: 8 });
+    expect(await update).toMatchObject({ players: snapshot.players, firstPlayerId: guest.id, revision: 8 });
+  } finally { db.close(); }
+});
+
+it('efface et sauvegarde un J1 devenu orphelin lors de la restauration v3, sans le rétablir au rejeu', async () => {
+  const database = tempDatabase();
+  const url = await start(database);
+  const [host, guest] = await Promise.all([connect(url), connect(url)]);
+  const { session } = success(await host.emitWithAck('lobby:create', { name: 'Alice' }));
+  const { view, session: guestSession } = success(await guest.emitWithAck('lobby:join', { code: session.code, name: 'Dinah' }));
+  const choice = selectFirstPlayer(view.you, view.revision);
+  const selected = success(await host.emitWithAck('lobby:action', choice));
+  await stop();
+
+  // Simulate a restored roster without the selected seat; there is no removal action.
+  const db = new DatabaseSync(database);
+  try {
+    const snapshot = JSON.parse(String(db.prepare('SELECT snapshot FROM lobbies').get()?.snapshot));
+    snapshot.players = selected.players.filter(({ id }) => id !== view.you);
+    db.prepare('UPDATE lobbies SET snapshot = ?').run(JSON.stringify(snapshot));
+    const restoredUrl = await start(database);
+    const [returned, removedGuest] = await Promise.all([connect(restoredUrl), connect(restoredUrl)]);
+    expect(await removedGuest.emitWithAck('lobby:resume', guestSession)).toEqual({ ok: false, error: 'unauthorized' });
+    const restored = success(await returned.emitWithAck('lobby:resume', session));
+    const cleared = { revision: selected.revision + 1, type: 'first-player-cleared' };
+    expect(restored).toMatchObject({ firstPlayerId: null, revision: cleared.revision, journal: [...selected.journal, cleared] });
+    expect(success(await returned.emitWithAck('lobby:action', choice))).toEqual(restored);
+    expect(await returned.emitWithAck('lobby:action', selectFirstPlayer(view.you, restored.revision)))
+      .toEqual({ ok: false, error: 'seat-not-found' });
+    expect(JSON.parse(String(db.prepare('SELECT snapshot FROM lobbies').get()?.snapshot)))
+      .toEqual({ ...snapshot, firstPlayerId: null, revision: restored.revision, journal: restored.journal });
+    await stop();
+    const reopened = await connect(await start(database));
+    expect(success(await reopened.emitWithAck('lobby:resume', session))).toEqual(restored);
+  } finally { db.close(); }
 });
 
 it('annule la migration complète en cas de snapshot v1 illisible', () => {

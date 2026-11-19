@@ -13,14 +13,17 @@ const messages: Record<ErrorCode, string> = {
   'room-full': 'Le salon est complet.',
   'already-seated': 'Cette connexion est déjà associée à un joueur. Rechargez la page.',
   unauthorized: 'Votre place n’a pas pu être retrouvée dans ce navigateur.',
-  conflict: 'Le salon a changé. Vérifiez les factions et votre statut, puis réessayez.',
+  conflict: 'Le salon a changé. Vérifiez les choix actuels, puis réessayez.',
   unavailable: 'Le serveur n’a pas pu terminer cette demande.',
   'faction-taken': 'Cette faction est déjà prise. Choisissez une faction disponible.',
   'faction-required': 'Choisissez une faction avant de vous déclarer prêt.',
+  'host-required': 'Seul l’hôte peut désigner le premier joueur.',
+  'seat-not-found': 'Ce siège n’est pas dans le salon. Choisissez un siège présent.',
 };
 const factionStatus = { available: 'Disponible', yours: 'Votre faction', taken: 'Prise' };
 type LobbyIntent = Omit<Extract<LobbyAction, { type: 'set-ready' }>, 'actionId' | 'expectedRevision'>
-  | Omit<Extract<LobbyAction, { type: 'select-faction' }>, 'actionId' | 'expectedRevision'>;
+  | Omit<Extract<LobbyAction, { type: 'select-faction' }>, 'actionId' | 'expectedRevision'>
+  | Omit<Extract<LobbyAction, { type: 'select-first-player' }>, 'actionId' | 'expectedRevision'>;
 const storageKey = (code: string) => `ww:seat:${code}`;
 const queryCode = new URLSearchParams(location.search).get('salon') ?? '';
 const initialCode = roomCode.safeParse(queryCode);
@@ -49,11 +52,18 @@ function invitation(code: string) {
   return url.href;
 }
 
+function seatLabel(players: LobbyView['players'], index: number) {
+  return `${players[index].name} (siège ${index + 1})`;
+}
+
 function journalEntry(item: LobbyView['journal'][number], players: LobbyView['players']) {
   if (item.type === 'factions-enabled') {
     const count = item.resetReadyCount;
     return <>Le choix de faction est disponible.{count === 1 ? ' Un siège est repassé non prêt.'
       : count > 1 ? ` ${count} sièges sont repassés non prêts.` : ''}</>;
+  }
+  if (item.type === 'first-player-cleared') {
+    return 'Le siège désigné n’est plus dans le salon. Aucun premier joueur n’est désigné.';
   }
   const actor = players.find((p) => p.id === item.actorId)?.name ?? 'Un joueur';
   if (item.type === 'select-faction') {
@@ -61,6 +71,10 @@ function journalEntry(item: LobbyView['journal'][number], players: LobbyView['pl
       ? `a remplacé ${FACTION_NAMES[item.previousFaction]} par ${FACTION_NAMES[item.faction]}.`
       : `a choisi ${FACTION_NAMES[item.faction]}.`;
     return <><strong>{actor}</strong> {choice}{item.wasReady && ' Son siège est repassé non prêt.'}</>;
+  }
+  if (item.type === 'select-first-player') {
+    const index = players.findIndex((p) => p.id === item.firstPlayerId);
+    return <><strong>{actor}</strong> a désigné {index >= 0 ? seatLabel(players, index) : 'un siège depuis retiré'} pour commencer.</>;
   }
   const change = item.type === 'joined' ? 'a rejoint le salon.' : item.ready ? 'est prêt.' : 'a retiré son statut prêt.';
   return <><strong>{actor}</strong> {change}</>;
@@ -157,6 +171,7 @@ function App() {
   }
 
   const me = view?.players.find((player) => player.id === view.you);
+  const firstPlayerIndex = view?.players.findIndex(({ id }) => id === view.firstPlayerId) ?? -1;
   function sendAction(intent: LobbyIntent, expectedRevision: number) {
     void request(async () => {
       const reply = await socket.emitWithAck('lobby:action', {
@@ -177,7 +192,7 @@ function App() {
       <p className="connection" data-online={connection === 'online'} role="status">{connectionLabel}</p>
     </header>
 
-    {!view && error && <p className="feedback" role="alert">{error}</p>}
+    {error && <p className="feedback" role="alert">{error}</p>}
     {notice && <p className="feedback" role="status">{notice}</p>}
 
     {!view ? <section className="panel entry" aria-labelledby="entry">
@@ -218,7 +233,6 @@ function App() {
       <section className="panel" aria-labelledby="factions">
         <h2 id="factions">Votre faction</h2>
         <p>Choisissez une faction pour vous déclarer prêt. Si vous en changez, vous devrez confirmer à nouveau votre statut.</p>
-        {error && <p className="feedback" role="alert">{error}</p>}
         <ul className="factions" aria-live="polite">
           {view.factions.map(({ id, status }) => {
             const blocked = disabled || status === 'taken';
@@ -236,6 +250,24 @@ function App() {
           onClick={() => sendAction({ type: 'set-ready', ready: !me.ready }, view.revision)}>
           {me.ready ? 'Retirer mon statut prêt' : 'Je suis prêt'}
         </button>}
+      </section>
+
+      <section className="panel first-player" aria-labelledby="first-player">
+        <h2 id="first-player">Premier joueur</h2>
+        <p id="tea-criterion">La personne qui a bu du thé le plus récemment commence.</p>
+        <p role="status">{firstPlayerIndex >= 0
+          ? <>Premier joueur désigné : <strong>{seatLabel(view.players, firstPlayerIndex)}</strong>.</>
+          : 'Aucun premier joueur désigné.'}</p>
+        {view.canSelectFirstPlayer ? <>
+          <p id="first-player-choice">Selon l’accord de la table, choisissez le siège qui commencera.</p>
+          <div className="controls" role="group" aria-labelledby="first-player-choice" aria-describedby="tea-criterion">
+            {view.players.map(({ id }, index) => <button key={id} type="button" className="secondary"
+              aria-pressed={id === view.firstPlayerId} aria-disabled={disabled}
+              onClick={() => { if (!disabled) sendAction({ type: 'select-first-player', firstPlayerId: id }, view.revision); }}>
+              {seatLabel(view.players, index)}
+            </button>)}
+          </div>
+        </> : <p>Seul l’hôte peut désigner le premier joueur.</p>}
       </section>
 
       <section className="panel journal" aria-labelledby="journal">
