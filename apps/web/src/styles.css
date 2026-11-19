@@ -24,7 +24,7 @@ p { margin: .7rem 0; }
 .entry { max-width: 32rem; margin-inline: auto; }
 .controls { display: flex; flex-wrap: wrap; gap: .55rem; }
 .lobby { display: grid; grid-template-columns: 1.4fr 1fr; gap: 1rem; align-items: start; }
-.journal { grid-column: 1 / -1; }
+.journal, .launch, .preparation { grid-column: 1 / -1; }
 .journal ol { margin-bottom: 0; overflow: auto; max-height: 12rem; }
 .journal li + li { margin-top: .3rem; }
 label { display: block; margin: 1rem 0; }

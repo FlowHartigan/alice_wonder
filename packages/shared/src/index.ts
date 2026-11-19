@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { gameState } from './game.ts';
 
 export * from './game.ts';
 
+export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 5;
 export const JOURNAL_LIMIT = 40;
 export const roomCode = z.string().trim().toUpperCase().regex(/^[A-F0-9]{8}$/);
@@ -31,10 +33,16 @@ const factionInput = z.strictObject({
 const firstPlayerInput = z.strictObject({
   actionId: id, type: z.literal('select-first-player'), firstPlayerId: id, expectedRevision: z.int().nonnegative(),
 });
-export const lobbyAction = z.discriminatedUnion('type', [readyInput, factionInput, firstPlayerInput]);
+const launchInput = z.strictObject({
+  actionId: id, type: z.literal('launch-preparation'), expectedRevision: z.int().nonnegative(),
+});
+export const lobbyAction = z.discriminatedUnion('type', [readyInput, factionInput, firstPlayerInput, launchInput]);
+const launchBlockerCodes = ['player-count', 'factions-incomplete', 'players-not-ready', 'first-player-required'] as const;
+export type LaunchBlocker = (typeof launchBlockerCodes)[number];
 export const errorCodes = [
   'invalid', 'room-not-found', 'room-full', 'already-seated', 'unauthorized', 'conflict', 'unavailable',
   'faction-taken', 'faction-required', 'host-required', 'seat-not-found',
+  'room-closed', 'already-launched', ...launchBlockerCodes,
 ] as const;
 export type ErrorCode = (typeof errorCodes)[number];
 
@@ -74,25 +82,62 @@ export const lobbyStateV2 = lobbyWithFactions.extend({
 }).refine(factionsAreUnique, uniqueFactionMessage);
 export type LobbyStateV2 = z.infer<typeof lobbyStateV2>;
 
-const lobbyEvent = z.discriminatedUnion('type', [
+const eventsV3 = [
   ...eventsV2,
   z.strictObject({ revision: z.int().positive(), type: z.literal('select-first-player'), actorId: id, firstPlayerId: id }),
   z.strictObject({ revision: z.int().positive(), type: z.literal('first-player-cleared') }),
-]);
+] as const;
 // During restoration only, allow a well-formed reference to a seat no longer on the roster.
-export const lobbySnapshot = lobbyWithFactions.extend({
-  version: z.literal(3), firstPlayerId: id.nullable(), journal: z.array(lobbyEvent).max(JOURNAL_LIMIT),
+export const lobbyStateV3 = lobbyWithFactions.extend({
+  version: z.literal(3), firstPlayerId: id.nullable(), journal: z.array(z.discriminatedUnion('type', eventsV3)).max(JOURNAL_LIMIT),
 }).refine(factionsAreUnique, uniqueFactionMessage);
+export type LobbyStateV3 = z.infer<typeof lobbyStateV3>;
+
+// WW-COUNT-001/002 (effectif seulement), WW-SETUP-002 et WW-SETUP-005.
+// Shared by the transition, its projection and validation on restore.
+export function preparationBlockers({ players, firstPlayerId }: Pick<LobbyStateV3, 'players' | 'firstPlayerId'>): LaunchBlocker[] {
+  const blockers: LaunchBlocker[] = [];
+  if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) blockers.push('player-count');
+  if (!players.every(({ faction }) => factionId.safeParse(faction).success) || !factionsAreUnique({ players })) {
+    blockers.push('factions-incomplete');
+  }
+  if (!players.every(({ ready }) => ready)) blockers.push('players-not-ready');
+  if (firstPlayerId === null || !players.some(({ id }) => id === firstPlayerId)) blockers.push('first-player-required');
+  return blockers;
+}
+
+const lobbyEvent = z.discriminatedUnion('type', [
+  ...eventsV3,
+  z.strictObject({ revision: z.int().positive(), type: z.literal('launch-preparation'), actorId: id }),
+]);
+export const lobbySnapshot = lobbyWithFactions.extend({
+  version: z.literal(4), firstPlayerId: id.nullable(), game: gameState.nullable(),
+  journal: z.array(lobbyEvent).max(JOURNAL_LIMIT),
+}).refine(factionsAreUnique, uniqueFactionMessage).refine((state) => {
+  const { players, hostId, game, journal, revision } = state;
+  const seats = new Set(players.map(({ id }) => id));
+  if (seats.size !== players.length || !seats.has(hostId)) return false;
+  const launches = journal.filter(({ type }) => type === 'launch-preparation');
+  if (!game) return launches.length === 0;
+  const last = journal.at(-1);
+  return preparationBlockers(state).length === 0
+    && game.phase.type === 'setup' && game.revision === 0 && game.decisions.length === 0 && game.history.length === 0
+    && game.playerIds.length === players.length && players.every(({ id }, i) => game.playerIds[i] === id)
+    && launches.length === 1 && last?.type === 'launch-preparation'
+    && last.actorId === hostId && last.revision === revision;
+}, 'Sièges ou état de préparation incohérents');
 export const lobbyState = lobbySnapshot.refine(({ firstPlayerId, players }) => (
   firstPlayerId === null || players.some(({ id }) => id === firstPlayerId)
 ), { message: 'Le premier joueur doit avoir un siège dans le salon', path: ['firstPlayerId'] });
 export type LobbyState = z.infer<typeof lobbyState>;
 export type LobbyAction = z.infer<typeof lobbyAction>;
 export type Session = z.infer<typeof credentials>;
-export type LobbyView = Omit<LobbyState, 'version'> & {
+export type LobbyView = Pick<LobbyState, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players' | 'journal'> & {
   you: string;
   canSetReady: boolean;
   canSelectFirstPlayer: boolean;
+  launch: { blockers: LaunchBlocker[] } | null;
+  preparation: { gameId: string } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };
 export type Reply<T> = { ok: true; value: T } | { ok: false; error: ErrorCode };

@@ -1,6 +1,6 @@
 # Wonderland’s War — salon web
 
-Ce prototype permet de créer un salon privé, d'inviter jusqu'à quatre autres joueurs, de choisir une faction disponible et de partager les choix, le statut prêt et le journal en temps réel. L'hôte peut désigner le premier joueur selon le critère du thé, sans choix par défaut. Une place est retrouvée après rechargement ou coupure réseau. Le lancement et la partie de plateau ne sont pas encore disponibles.
+Ce prototype permet de créer un salon privé, d'inviter jusqu'à quatre autres joueurs et de partager les choix, les statuts prêts et le journal en temps réel. L'hôte désigne le premier joueur selon le critère du thé, puis peut lancer la préparation lorsque les 2 à 5 sièges sont prêts et ont chacun une faction distincte. Le lancement fige ces choix et ferme les admissions, mais les joueurs admis peuvent toujours reprendre leur place. La mise en place du plateau et la partie jouable ne sont pas encore disponibles.
 
 ## Démarrer en local
 
@@ -27,15 +27,16 @@ npm.cmd start
 2. Créer le salon et partager le lien (ou l'adresse et le code) avec le second ordinateur, sur le même réseau.
 3. Rejoindre le salon, choisir une faction disponible, cliquer « Je suis prêt » et vérifier les changements chez l'hôte. Recharger la page du second joueur : même place, même faction, même statut, même journal.
 4. Vérifier qu'aucun premier joueur n'est désigné à l'arrivée. Après accord de la table sur la personne ayant bu du thé le plus récemment, l'hôte choisit son siège dans « Premier joueur ». Recharger les deux pages : le choix est identique et seul l'hôte peut le modifier.
+5. Quand tout le monde est prêt, cliquer « Lancer la préparation » côté hôte. Les deux navigateurs voient les sièges, leurs factions et J1 dans le panneau de préparation. Un troisième profil ne peut plus rejoindre ; les deux profils déjà admis retrouvent le panneau au rechargement du même lien.
 
 SQLite enregistre l'état dans `.data/lobbies.sqlite` par défaut (dossier configurable avec `DATA_DIR`). Au redémarrage, ne changez pas l'adresse utilisée dans le navigateur ni le dossier de données pour reprendre le salon.
 
-### Mettre à jour un salon existant (v1 ou v2 → v3)
+### Mettre à jour un salon existant (v1, v2 ou v3 → v4)
 
 1. Préparez le code mis à jour et compilez le client (`npm ci`, `npm run build`, Node.js ≥ 24) sans lancer un deuxième serveur sur la base active.
 2. Lors d'une fenêtre de maintenance, arrêtez l'ancien serveur, puis faites une sauvegarde SQLite cohérente hors du dossier de données (conservez les éventuels fichiers `-wal` / `-shm` avec la base si vous faites une copie à froid). Ne supprimez pas la base existante.
-3. Lancez `npm start` avec **le même dossier de données** (chemin absolu `DATA_DIR` si vous changez de checkout) et les mêmes paramètres réseau (`HOST`, `PORT`, `PUBLIC_ORIGIN` si défini). La migration se fait au démarrage. Pour revenir à une ancienne version, arrêtez le serveur v3 et restaurez la sauvegarde correspondante avec l'ancien code : v1 et v2 ne savent pas ouvrir une base v3.
-4. Rechargez le lien d'invitation **sur la même origine et dans le même profil navigateur**, sans vider le stockage local. Les places et les liens sont conservés. En partant de v1, les anciens sièges prêts doivent choisir une faction puis se redéclarer prêts (migration #5) ; en partant de v2, factions et statuts sont conservés. L'hôte désigne J1 explicitement dans les deux cas.
+3. Lancez `npm start` avec **le même dossier de données** (chemin absolu `DATA_DIR` si vous changez de checkout) et les mêmes paramètres réseau (`HOST`, `PORT`, `PUBLIC_ORIGIN` si défini). La migration se fait au démarrage. Pour revenir à une ancienne version, arrêtez le serveur v4 et restaurez la sauvegarde d'avant migration avec l'ancien code : les anciennes versions ne savent pas ouvrir une base v4.
+4. Rechargez le lien **sur la même origine et dans le même profil navigateur**, sans vider le stockage local. Les places et les liens sont conservés. En partant de v1, les anciens sièges prêts doivent choisir une faction puis se redéclarer prêts (migration #5) ; en partant de v2, factions et statuts sont conservés. L'hôte désigne J1 explicitement dans les deux cas. En partant de v3, une désignation valide est conservée, et aucun salon n'est lancé automatiquement. Une préparation déjà lancée en v4 est retrouvée de la même manière après redémarrage.
 
 ## Vérifier
 

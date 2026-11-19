@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { credentials, FACTION_NAMES, MAX_PLAYERS, roomCode } from '@wonderland/shared';
+import { credentials, FACTION_NAMES, MAX_PLAYERS, MIN_PLAYERS, roomCode } from '@wonderland/shared';
 import type { ClientEvents, ErrorCode, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
 import './styles.css';
 
@@ -17,13 +17,17 @@ const messages: Record<ErrorCode, string> = {
   unavailable: 'Le serveur n’a pas pu terminer cette demande.',
   'faction-taken': 'Cette faction est déjà prise. Choisissez une faction disponible.',
   'faction-required': 'Choisissez une faction avant de vous déclarer prêt.',
-  'host-required': 'Seul l’hôte peut désigner le premier joueur.',
+  'host-required': 'Cette action est réservée à l’hôte.',
   'seat-not-found': 'Ce siège n’est pas dans le salon. Choisissez un siège présent.',
+  'room-closed': 'La préparation a commencé. Le salon est fermé aux nouvelles admissions et sa configuration est figée.',
+  'already-launched': 'La préparation a déjà été lancée.',
+  'player-count': `Il faut entre ${MIN_PLAYERS} et ${MAX_PLAYERS} joueurs pour lancer la préparation.`,
+  'factions-incomplete': 'Chaque joueur doit choisir une faction différente.',
+  'players-not-ready': 'Tous les joueurs doivent confirmer qu’ils sont prêts.',
+  'first-player-required': 'Désignez le premier joueur parmi les sièges du salon.',
 };
 const factionStatus = { available: 'Disponible', yours: 'Votre faction', taken: 'Prise' };
-type LobbyIntent = Omit<Extract<LobbyAction, { type: 'set-ready' }>, 'actionId' | 'expectedRevision'>
-  | Omit<Extract<LobbyAction, { type: 'select-faction' }>, 'actionId' | 'expectedRevision'>
-  | Omit<Extract<LobbyAction, { type: 'select-first-player' }>, 'actionId' | 'expectedRevision'>;
+type LobbyIntent = { [T in LobbyAction['type']]: Omit<Extract<LobbyAction, { type: T }>, 'actionId' | 'expectedRevision'> }[LobbyAction['type']];
 const storageKey = (code: string) => `ww:seat:${code}`;
 const queryCode = new URLSearchParams(location.search).get('salon') ?? '';
 const initialCode = roomCode.safeParse(queryCode);
@@ -66,6 +70,7 @@ function journalEntry(item: LobbyView['journal'][number], players: LobbyView['pl
     return 'Le siège désigné n’est plus dans le salon. Aucun premier joueur n’est désigné.';
   }
   const actor = players.find((p) => p.id === item.actorId)?.name ?? 'Un joueur';
+  if (item.type === 'launch-preparation') return <><strong>{actor}</strong> a lancé la préparation.</>;
   if (item.type === 'select-faction') {
     const choice = item.previousFaction
       ? `a remplacé ${FACTION_NAMES[item.previousFaction]} par ${FACTION_NAMES[item.faction]}.`
@@ -91,6 +96,9 @@ function App() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const preparationTitle = useRef<HTMLHeadingElement>(null);
+  const wasInLobby = useRef(false);
+  const preparing = Boolean(view?.preparation);
 
   function receive(next: LobbyView) {
     setView((previous) => previous && previous.code === next.code && previous.revision > next.revision ? previous : next);
@@ -144,6 +152,12 @@ function App() {
     };
   }, []);
 
+  const inLobby = Boolean(view) && !preparing;
+  useEffect(() => {
+    if (wasInLobby.current && preparing) preparationTitle.current?.focus();
+    wasInLobby.current = inLobby;
+  }, [inLobby, preparing]);
+
   async function request(work: () => Promise<void>) {
     if (busy.current || !socket.connected || connection !== 'online') return;
     busy.current = true;
@@ -183,6 +197,7 @@ function App() {
   }
 
   const disabled = pending || connection !== 'online';
+  const blockers = view?.launch?.blockers;
   const connectionLabel = { waiting: 'Connexion en cours', online: 'Connecté', offline: 'Déconnecté' }[connection];
   return <main>
     <header className="hero">
@@ -208,6 +223,20 @@ function App() {
         </div>
       </form>
     </section> : <div className="lobby">
+      {preparing ? <section className="panel preparation" aria-labelledby="preparation">
+        <h2 id="preparation" ref={preparationTitle} tabIndex={-1}>Préparation de la partie</h2>
+        <p><strong>Admissions fermées.</strong> Les sièges et la configuration sont figés. Les joueurs déjà admis peuvent reprendre leur place avec ce même lien.</p>
+        <p>Salon <strong>{view.code}</strong> · {view.players.length} joueurs</p>
+        <ul className="players" aria-label="Sièges et factions de la préparation">
+          {view.players.map((p, index) => <li key={p.id}>
+            <span><strong>{seatLabel(view.players, index)}</strong>{p.id === view.hostId && <small>Hôte</small>}{p.id === view.you && <small>Vous</small>}
+              <span className="player-faction">{p.faction && FACTION_NAMES[p.faction]}</span>
+            </span>
+            {p.id === view.firstPlayerId && <span className="badge">Premier joueur (J1)</span>}
+          </li>)}
+        </ul>
+        <p>La mise en place du plateau n’est pas encore disponible.</p>
+      </section> : <>
       <section className="panel" aria-labelledby="players">
         <div className="section-title"><h2 id="players">Joueurs</h2><span>{view.players.length} / {MAX_PLAYERS}</span></div>
         <ul className="players">
@@ -270,6 +299,16 @@ function App() {
         </> : <p>Seul l’hôte peut désigner le premier joueur.</p>}
       </section>
 
+      {blockers && <section className="panel launch" aria-labelledby="launch">
+        <h2 id="launch">Lancement</h2>
+        <div id="launch-conditions" aria-live="polite">
+          {blockers.length > 0 ? <ul>{blockers.map((reason) => <li key={reason}>{messages[reason]}</li>)}</ul>
+            : <p>Tout est prêt. Le lancement fermera les admissions et figera les choix.</p>}
+        </div>
+        <button type="button" disabled={disabled || blockers.length > 0} aria-describedby="launch-conditions"
+          onClick={() => sendAction({ type: 'launch-preparation' }, view.revision)}>Lancer la préparation</button>
+      </section>}
+      </>}
       <section className="panel journal" aria-labelledby="journal">
         <h2 id="journal">Journal du salon</h2>
         <ol reversed tabIndex={0} aria-labelledby="journal">

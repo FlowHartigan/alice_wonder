@@ -1,4 +1,4 @@
-import { gameAction } from '@wonderland/shared';
+import { gameAction, gameState } from '@wonderland/shared';
 import type { GamePhase, GameState, PrivateGameEvent, PrivatePlayerView, PublicGameView } from '@wonderland/shared';
 
 /** Server context resolved from an authenticated session, never from the command. */
@@ -8,6 +8,12 @@ type Receipt = { revision: number; event: PrivateGameEvent };
 type GameActionResult =
   | { ok: true; state: GameState; changed: boolean; receipt: Receipt }
   | { ok: false; error: 'unauthorized' | 'invalid' | 'conflict' | 'decision-unavailable' | 'wrong-phase' };
+
+export function initializeGame(gameId: string, playerIds: string[]): GameState {
+  return gameState.parse({
+    version: 1, gameId, playerIds, revision: 0, phase: { type: 'setup' }, decisions: [], history: [],
+  });
+}
 
 // In a validated snapshot, exact membership also rejects non-canonical session IDs.
 function actorIn(state: GameState, seat: GameSeat | undefined): string | undefined {
