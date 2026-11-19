@@ -14,6 +14,8 @@ const teaSummary = 'Table du Thé : 11 chaises ouvertes. Chaises 4J et 5J bloqu�
 const scoreCaption = 'Marqueurs Score de Région — attribution initiale';
 const firstTeaCaption = 'Aperçu — ordre prévu du premier Thé et Éclats de départ';
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
+const reveal = 'Quête révélée : Remporter le croquet du Jardin. Région hors jeu : Jardin des Fleurs vivantes.';
+const excluded = 'jardin-des-fleurs-vivantes';
 const scoreSlots = [
   { id: 'donjon-rouge', name: 'Donjon rouge', pv: ['2', '6', '12'], x: 0.874, y: 0.671 },
   { id: 'foret-de-tulgey', name: 'Forêt de Tulgey', pv: ['2', '8', '10'], x: 0.569, y: 0.892 },
@@ -38,15 +40,30 @@ async function checkFirstTea(player: Page, expected: [string, string][]) {
 async function checkScores(player: Page, { twoPlayers, imageLoaded = true }: { twoPlayers: boolean; imageLoaded?: boolean }) {
   const preview = player.getByRole('region', { name: previewTitle });
   const table = preview.getByRole('table', { name: scoreCaption });
+  const activeSlots = scoreSlots.filter(({ id }) => !twoPlayers || id !== excluded);
   await expect(table).toBeVisible();
   await expect(table.getByRole('columnheader')).toHaveText(['Région', 'PV round I', 'PV round II', 'PV round III']);
-  await expect(table.getByRole('row')).toHaveCount(6);
-  await expect(preview.getByText(deferredRemoval)).toHaveCount(twoPlayers ? 1 : 0);
+  await expect(table.getByRole('rowheader')).toHaveText(activeSlots.map(({ name }) => name));
+  await expect(preview.getByText(deferredRemoval)).toHaveCount(0);
+  const badge = preview.locator('.board-region-excluded');
+  if (twoPlayers) {
+    await expect(preview.getByText(reveal, { exact: true })).toBeVisible();
+    await expect(preview.getByRole('img')).toHaveAccessibleDescription(`${teaSummary} ${reveal}`);
+    if (imageLoaded) {
+      await expect(badge).toBeVisible();
+      await expect(badge).toHaveText('Hors jeu');
+      await expect(badge).toHaveAttribute('data-region', excluded);
+      await expect(badge).toHaveAttribute('aria-hidden', 'true');
+    } else await expect(badge).toHaveCount(0);
+  } else {
+    await expect(preview.getByText(/Quête révélée|Région hors jeu/)).toHaveCount(0);
+    await expect(badge).toHaveCount(0);
+  }
   const markers = preview.locator('.board-score-marker');
-  await expect(markers).toHaveCount(imageLoaded ? 5 : 0);
+  await expect(markers).toHaveCount(imageLoaded ? activeSlots.length : 0);
   const image = await preview.getByRole('img').boundingBox();
   if (!image) throw new Error('Aperçu introuvable');
-  for (const { id, name, pv, x, y } of scoreSlots) {
+  for (const { id, name, pv, x, y } of activeSlots) {
     const row = table.getByRole('row').filter({ has: player.getByRole('rowheader', { name, exact: true }) });
     await expect(row.getByRole('cell')).toHaveText(pv);
     if (!imageLoaded) continue;
@@ -65,7 +82,7 @@ async function checkBoard(player: Page) {
   const preview = player.getByRole('region', { name: previewTitle });
   const image = preview.getByRole('img', { name: /Plateau central officiel en français/ });
   await expect(preview.getByText(teaSummary, { exact: true })).toBeVisible();
-  await expect(image).toHaveAccessibleDescription(teaSummary);
+  await expect(image).toHaveAccessibleDescription(`${teaSummary} ${reveal}`);
   await expect(image).toHaveAttribute('src', /plateau-principal-fr.*\.webp$/);
   await expect.poll(() => image.evaluate((element: HTMLImageElement) =>
     [element.complete, element.naturalWidth, element.naturalHeight])).toEqual([true, 2400, 1637]);
@@ -243,6 +260,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(newcomer.getByRole('region', { name: 'Préparation de la partie' })).toHaveCount(0);
       await expect(newcomer.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
+      await expect(newcomer.getByText(/Quête révélée|Région hors jeu/)).toHaveCount(0);
     } finally {
       await otherBrowser.close();
     }
@@ -251,7 +269,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
   }
 });
 
-test('cinq sièges dont quatre simulés : ordre partagé, J5 à zéro, aucune chaise bloquée', async ({ page }) => {
+for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : ordre partagé, cinq marqueurs, pas de Quête`, async ({ page }) => {
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)), random: () => 0 });
   const clients: Socket<ServerEvents, ClientEvents>[] = [];
   const guests: { session: Session; id: string }[] = [];
@@ -274,7 +292,7 @@ test('cinq sièges dont quatre simulés : ordre partagé, J5 à zéro, aucune ch
     await page.getByRole('button', { name: 'Alice', exact: true }).click();
     await page.getByRole('button', { name: 'Je suis prêt' }).click();
     await expect(page.getByRole('button', { name: 'Retirer mon statut prêt' })).toBeEnabled();
-    for (const [i, faction] of FACTION_IDS.slice(1).entries()) {
+    for (const [i, faction] of FACTION_IDS.slice(1, count).entries()) {
       const guest: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
       clients.push(guest);
       guest.on('lobby:update', (view) => {
@@ -289,7 +307,7 @@ test('cinq sièges dont quatre simulés : ordre partagé, J5 à zéro, aucune ch
         type: 'set-ready', actionId: randomUUID(), expectedRevision: picked.revision, ready: true,
       }));
     }
-    await expect(page.getByText('Invité 4 est prêt.')).toBeVisible();
+    await expect(page.getByText(`Invité ${count - 1} est prêt.`)).toBeVisible();
     await page.getByRole('button', { name: 'Invité 2 (siège 3)' }).click();
     await expect(page.getByRole('table', { name: scoreCaption })).toHaveCount(0);
     await expect(page.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
@@ -298,24 +316,19 @@ test('cinq sièges dont quatre simulés : ordre partagé, J5 à zéro, aucune ch
     await page.keyboard.press('Tab');
     await expect(page.getByRole('table', { name: scoreCaption })).toBeFocused();
     const preview = page.getByRole('region', { name: previewTitle });
-    await expect(preview.getByText(/13 chaises ouvertes\. Aucune chaise bloquée/)).toBeVisible();
-    await expect(preview.locator('.board-blocker')).toHaveCount(0);
+    await expect(preview.getByText(`${count + 8} chaises ouvertes.`, { exact: false })).toBeVisible();
+    await expect(preview.locator('.board-blocker')).toHaveCount(5 - count);
     await checkScores(page, { twoPlayers: false });
-    const expected: [string, string][] = [
-      ['Invité 2 (siège 3)', '3'], ['Invité 3 (siège 4)', '2'], ['Invité 4 (siège 5)', '2'],
-      ['Camille (siège 1)', '1'], ['Invité 1 (siège 2)', '0'],
-    ];
+    const labels = [...guests.slice(1).map((_, i) => `Invité ${i + 2} (siège ${i + 3})`), 'Camille (siège 1)', 'Invité 1 (siège 2)'];
+    const shards = count === 3 ? [3, 2, 1] : count === 4 ? [3, 2, 2, 1] : [3, 2, 2, 1, 0];
+    const expected: [string, string][] = labels.map((label, i) => [label, String(shards[i])]);
     await checkFirstTea(page, expected);
-    await expect.poll(() => preparedViews.size).toBe(4);
-    const [firstGuest, secondGuest, thirdGuest, fourthGuest] = guests;
+    await expect.poll(() => preparedViews.size).toBe(count - 1);
+    const [firstGuest, secondGuest] = guests;
     const { hostId, preparation: shared } = preparedViews.get(firstGuest.id)!;
-    expect(shared?.firstTeaPreview).toEqual([
-      { playerId: secondGuest.id, turn: 1, plannedShards: 3 },
-      { playerId: thirdGuest.id, turn: 2, plannedShards: 2 },
-      { playerId: fourthGuest.id, turn: 3, plannedShards: 2 },
-      { playerId: hostId, turn: 4, plannedShards: 1 },
-      { playerId: firstGuest.id, turn: 5, plannedShards: 0 },
-    ]);
+    expect(shared?.firstTeaPreview).toEqual([...guests.slice(1).map(({ id }) => id), hostId, firstGuest.id]
+      .map((playerId, i) => ({ playerId, turn: i + 1, plannedShards: shards[i] })));
+    expect(shared?.twoPlayerSetup).toBeNull();
     for (const { id } of guests) expect(preparedViews.get(id)?.preparation).toEqual(shared);
 
     clients[1].disconnect();

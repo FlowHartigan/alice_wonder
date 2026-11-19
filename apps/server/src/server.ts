@@ -5,7 +5,8 @@ import type { ZodType } from 'zod';
 import { viewFor } from '@wonderland/game-engine';
 import type { RandomSource } from '@wonderland/game-engine';
 import { createInput, joinInput, credentials, lobbyAction } from '@wonderland/shared';
-import type { ClientEvents, LobbyState, Reply, ServerEvents } from '@wonderland/shared';
+import type { ClientEvents, Reply, ServerEvents } from '@wonderland/shared';
+import type { LobbyState } from '@wonderland/shared/lobby-storage';
 import { openStore } from './store.ts';
 import type { Seat } from './store.ts';
 

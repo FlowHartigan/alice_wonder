@@ -6,17 +6,17 @@ export type TwoPlayerSetupQuest = Readonly<{ id: string; exploitRegionId: Region
 
 type InitialRegionScores = Pick<RegionScoreMarkerSetup, 'placements' | 'storedMarkerId'>;
 
-export type TwoPlayerRegionSetupInput = Readonly<{
-  shuffledQuestDeck: readonly TwoPlayerSetupQuest[];
+export type TwoPlayerRegionSetupInput<Quest extends TwoPlayerSetupQuest = TwoPlayerSetupQuest> = Readonly<{
+  shuffledQuestDeck: readonly Quest[];
   initialRegionScores: InitialRegionScores;
 }>;
 
 /** Internal domain data, not a public view. The remaining deck is face down. */
-export type TwoPlayerRegionSetupResult = Readonly<{
-  revealedQuest: TwoPlayerSetupQuest;
+export type TwoPlayerRegionSetupResult<Quest extends TwoPlayerSetupQuest = TwoPlayerSetupQuest> = Readonly<{
+  revealedQuest: Quest;
   excludedRegionId: RegionId;
-  excludedQuests: readonly TwoPlayerSetupQuest[];
-  remainingQuestDeck: readonly TwoPlayerSetupQuest[];
+  excludedQuests: readonly Quest[];
+  remainingQuestDeck: readonly Quest[];
   regionScores: Required<RegionScoreMarkerSetup>;
   activeRegionCircuit: readonly RegionId[];
   activeRegionNeighbors: Readonly<Record<RegionId, readonly RegionId[]>>;
@@ -28,7 +28,9 @@ export type TwoPlayerRegionSetupResult = Readonly<{
  * (top at index 0), and provides the complete initial Score marker inventory.
  * Throws TypeError for an invalid deck or inventory. No random draw or reshuffle here.
  */
-export function resolveTwoPlayerRegionSetup(input: TwoPlayerRegionSetupInput): TwoPlayerRegionSetupResult {
+export function resolveTwoPlayerRegionSetup<Quest extends TwoPlayerSetupQuest>(
+  input: TwoPlayerRegionSetupInput<Quest>,
+): TwoPlayerRegionSetupResult<Quest> {
   const { shuffledQuestDeck, initialRegionScores: scores } = input;
   if (!Array.isArray(shuffledQuestDeck) || shuffledQuestDeck.length !== 30) {
     throw new TypeError('La pioche initiale doit contenir exactement 30 Quêtes');
@@ -53,8 +55,8 @@ export function resolveTwoPlayerRegionSetup(input: TwoPlayerRegionSetupInput): T
 
   const revealedQuest = shuffledQuestDeck[0];
   const excludedRegionId = revealedQuest.exploitRegionId;
-  const excludedQuests: TwoPlayerSetupQuest[] = [];
-  const remainingQuestDeck: TwoPlayerSetupQuest[] = [];
+  const excludedQuests: Quest[] = [];
+  const remainingQuestDeck: Quest[] = [];
   for (const quest of shuffledQuestDeck) {
     (quest.exploitRegionId === excludedRegionId ? excludedQuests : remainingQuestDeck).push(quest);
   }
