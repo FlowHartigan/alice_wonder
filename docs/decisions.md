@@ -1,0 +1,11 @@
+# Décisions
+
+| Décision | Motif / suite |
+|---|---|
+| Livret FR Lucky Duck Games `LKY WWR-R01-FR` comme référence candidate | La fiche éditeur correspond au jeu de base en français. Confirmer tirage et errata avant d'activer les règles. |
+| Premier jalon : salon et statut prêt | Permet de tester synchronisation, validations et reprise sans inventer de mécanique de plateau. L'hôte est identifié ; sélection de faction et lancement viendront avec la préparation validée. |
+| SQLite local en attendant PostgreSQL | Le pilote intégré à Node permet l'essai sans installateur de base ni Docker. Le stockage est isolé dans `apps/server/src/store.ts` ; `user_version` et le champ `version` des snapshots distinguent migration SQL et format métier. |
+| Origine unique pour le parcours local | Fournir une URL simple aux participants. Même origine exigée pour les connexions navigateur ; `PUBLIC_ORIGIN` est disponible derrière un proxy. |
+| Aucune ressource graphique officielle intégrée | UI de salon en CSS ; enregistrer les autorisations avant import. Voir [`LICENSES.md`](../LICENSES.md). |
+
+Limites du prototype : la place persiste quand le navigateur se déconnecte ; suppression de place et archivage des salons viendront ensuite. Conserver l'origine et les données du navigateur pour reprendre une place. Si la première réponse à une création ou admission est perdue avant réception du secret, la place attribuée n'est pas récupérable ; cette opération n'est pas rejouée automatiquement.

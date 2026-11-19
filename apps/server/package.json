@@ -1,0 +1,13 @@
+{
+  "name": "@wonderland/server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "@wonderland/game-engine": "*",
+    "@wonderland/shared": "*",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "zod": "^4.3.0"
+  }
+}
