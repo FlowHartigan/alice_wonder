@@ -18,7 +18,9 @@ describe('Catalogue des régions du jeu de base FR', () => {
       [mare]: 'Mare de Larmes',
       [comte]: 'Comté de la Déraison',
     });
-    expect(getActiveRegionCircuit()).toEqual(clockwise);
+    const circuit = getActiveRegionCircuit();
+    expect(circuit).toEqual(clockwise);
+    expect(circuit[(circuit.indexOf(comte) + 1) % circuit.length]).toBe(donjon);
   });
 
   it('relève quatre voisinages physiques et la liaison Mare–Comté (WW-MAP-001)', () => {
@@ -51,11 +53,15 @@ describe('Catalogue des régions du jeu de base FR', () => {
     expect(getActiveRegionNeighbors(foret, donjon)).toEqual([jardin]);
   });
 
-  it.each(clockwise)('exclut %s du circuit et du graphe actif sans ajouter de voisin', excluded => {
+  it.each([
+    { excluded: donjon, order: [foret, jardin, mare, comte] },
+    { excluded: foret, order: [jardin, mare, comte, donjon] },
+    { excluded: jardin, order: [mare, comte, donjon, foret] },
+    { excluded: mare, order: [comte, donjon, foret, jardin] },
+    { excluded: comte, order: [donjon, foret, jardin, mare] },
+  ] as const)('exclut $excluded du circuit et du graphe actif sans ajouter de voisin', ({ excluded, order }) => {
     const circuit = getActiveRegionCircuit(excluded);
-    expect(circuit[0]).toBe(clockwise[(clockwise.indexOf(excluded) + 1) % clockwise.length]);
-    expect(new Set(circuit)).toEqual(new Set(clockwise.filter(region => region !== excluded)));
-    expect(circuit).toHaveLength(4);
+    expect(circuit).toEqual(order);
     expect(getActiveRegionNeighbors(excluded, excluded)).toEqual([]);
     for (const region of circuit) {
       const neighbors = getActiveRegionNeighbors(region, excluded);
