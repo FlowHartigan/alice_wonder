@@ -7,6 +7,7 @@ import { assignRegionScoreMarkers } from './region-score-markers.ts';
 export * from './battle.ts';
 export * from './game.ts';
 export * from './region-score-markers.ts';
+export * from './two-player-region-setup.ts';
 
 type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
