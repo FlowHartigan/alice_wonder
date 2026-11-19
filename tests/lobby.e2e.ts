@@ -97,6 +97,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(launch).toBeDisabled();
       await expect(launch).toHaveAccessibleDescription('Tous les joueurs doivent confirmer qu’ils sont prêts.');
       await page.getByRole('button', { name: 'Je suis prêt' }).click();
+      await expect(guest.getByText('Camille est prêt.')).toBeVisible();
       await guestReady.click();
       await expect(launch).toBeEnabled();
       await launch.focus();
