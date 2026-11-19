@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export * from './game.ts';
+
 export const MAX_PLAYERS = 5;
 export const JOURNAL_LIMIT = 40;
 export const roomCode = z.string().trim().toUpperCase().regex(/^[A-F0-9]{8}$/);
