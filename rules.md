@@ -73,6 +73,10 @@ La fiche commerciale agrège « 254 pions » sans ventilation et classe les 24 c
 - Lot par joueur : 1 plateau, 1 silhouette Chef, 14 Partisans, 5 Châteaux, 1 sac, 4 jetons Chef (Force 1/1/1/2), 6 Artefacts (Force 3), 6 disques, 1 cube, 1 Bouclier, 1 pion Score 50+/100+ (à laisser de côté), les Folie et Forge de `WW-SETUP-003`, 2 cartes Référence Alliés, 1 carte Référence des phases et 4 cartes Pari à 3–5 (aucune à 2). Si le Jabberwocky est choisi, lui donner `effectif + 2` jetons Poison en réserve personnelle et ranger le reste ; sinon, aucun Poison en jeu. Ce décompte précède le pouvoir d'ouverture du Thé.
 - Le pouvoir inné du Chef est distinct des quatre capacités initialement couvertes par des disques. Les pouvoirs décrits p. 10–11 pour les faces ordinaires s'appliquent au Thé : Alice se déplace en sens inverse, le Chapelier peut remplir les chaises vides et prendre une carte sans se déplacer une fois par Thé, la Reine peut répartir ses Partisans, le Chat peut céder un Éclat sur un résultat de 2 ou 3, le Jabberwocky peut empoisonner des cartes dès l'ouverture du Thé. Cela ne change ni l'ordre des sièges ni le contenu initial des sacs. À 2J, les pistes et certains pouvoirs/capacités imprimés changent : ne pas recopier les valeurs du côté ordinaire (voir `WW-COUNT-001` et `WW-FACTION-002`).
 
+**Périmètre du salon web ([#5](https://github.com/FlowHartigan/alice_wonder/issues/5)) : règle validée et implémentée pour la liste et l'exclusivité uniquement.** Le [livret officiel FR `LKY WWR-R01-FR`](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416), p. 5 étape A, fait choisir une faction et prendre son matériel ; l'inventaire p. 2–3 présente un plateau, un Chef et un lot correspondant par faction. C'est ce matériel unique qui fonde l'exclusivité. Voir `WW-FACTION-001` pour les noms p. 10–11. Ni les faces, ni les dotations, ni le reste de la mise en place ne sont implémentés ici.
+
+**Conventions du salon, non prescrites par le livret :** chaque siège choisit ou modifie sa faction lui-même. Une demande concurrente pour une faction déjà attribuée est refusée ; la disponibilité confirmée est partagée. Il faut une faction pour être prêt. Changer de faction libère l'ancienne et remet le siège à non prêt ; une sélection identique ou le rejeu d'un succès ne change rien.
+
 **Contrôle :** choisir deux factions distinctes dont le Jabberwocky ; vérifier les faces 2J, les silhouettes et les quatre emplacements couverts. Refaire à 5J avec les cinq factions, sans emprunt à une autre faction.
 
 ### WW-SETUP-003 — Ressources individuelles et Quêtes
@@ -209,9 +213,11 @@ Voir la [recette documentaire](docs/rules-coverage.md#recette-documentaire-de-la
 
 **WW-MAP-004** — À vérifier, p. 12, 14 et 21. Le score de conquête est imprimé par Région et par round sur le marqueur assigné ; utiliser `WW-WAR-007` pour le classement et la récompense. Un Château ne donne pas à lui seul le droit de participer au combat suivant.
 
-## 7. Factions et asymétrie — À vérifier
+## 7. Factions et asymétrie — Validation partielle
 
-**WW-FACTION-001** — À vérifier pour l'édition retenue, p. 10–11. Jeu de base FR : Alice, Chapelier fou, Reine de cœur, Jabberwocky, Chat du Cheshire.
+### WW-FACTION-001 — Liste des factions
+
+**Statut : Validée pour les cinq noms uniquement.** [Livret officiel du jeu de base `LKY WWR-R01-FR`](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416), rubrique « Pouvoirs des Chefs » : **Jabberwocky** et **Chapelier fou** (p. 10), **Reine de cœur**, **Alice** et **Chat du Cheshire** (p. 11). Le salon reprend ces noms ; l'exclusivité est couverte par `WW-SETUP-002`. Les pouvoirs, capacités, pistes et différences des faces 2J ne sont pas validés par ce contrôle ; la boîte physique n'a pas été vérifiée (voir §0 et §12).
 
 **WW-FACTION-002** — À vérifier, p. 8, 10–11, 21–23. Alice inverse son sens au Thé ; la Reine répartit ses Partisans ; le Chapelier peut une fois par Thé remplir les chaises vides puis prendre une carte sans se déplacer ; le Chat peut céder un Éclat sur un résultat de 2 ou 3 ; le Jabberwocky dispose du Poison. Relever les quatre capacités de chaque plateau ainsi que les différences côté 2J.
 
@@ -319,12 +325,12 @@ Pour chaque action jouable, l'implémentation doit préciser :
 
 | Domaine | Documentation | Implémentation | Tests |
 |---|---|---|---|
-| Préparation | Validée sur livret · sous-périmètres et réserves en §1 et §10 | Non démarrée | Recette documentaire 2–5 |
+| Préparation | Validée sur livret · sous-périmètres et réserves en §1 et §10 | Choix exclusif en salon uniquement | Recette documentaire 2–5 ; intégration et navigateur pour le choix |
 | Phase de Thé | À vérifier | Non démarrée | Non démarrés |
 | Phase de Guerre | À vérifier | Non démarrée | Non démarrés |
 | Sacs et jetons | À vérifier | Non démarrée | Non démarrés |
 | Régions et châteaux | À vérifier | Non démarrée | Non démarrés |
-| Factions et pouvoirs | À vérifier | Non démarrée | Non démarrés |
+| Factions et pouvoirs | Liste validée ; pouvoirs et capacités à vérifier | Liste et exclusivité en salon | [Recette du choix de faction](docs/rules-coverage.md#recette-du-choix-de-faction-en-salon) |
 | Cartes et quêtes | À vérifier | Non démarrée | Non démarrés |
 | Scores et fin de partie | À vérifier | Non démarrée | Non démarrés |
 | Règles à deux joueurs | Préparation établie validée · ordre du filtre non validé · cas d'arrêt des pioches validés pour le projet ([#47](https://github.com/FlowHartigan/alice_wonder/issues/47)) | Non démarrée | Recettes documentaires de la préparation et de l'arrêt des pioches ; tests moteur du combat à faire dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22) |

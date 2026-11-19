@@ -3,8 +3,8 @@ import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { credentials, MAX_PLAYERS, roomCode } from '@wonderland/shared';
-import type { ClientEvents, ErrorCode, LobbyView, ServerEvents, Session } from '@wonderland/shared';
+import { credentials, FACTION_NAMES, MAX_PLAYERS, roomCode } from '@wonderland/shared';
+import type { ClientEvents, ErrorCode, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
 import './styles.css';
 
 const messages: Record<ErrorCode, string> = {
@@ -13,9 +13,14 @@ const messages: Record<ErrorCode, string> = {
   'room-full': 'Le salon est complet.',
   'already-seated': 'Cette connexion est déjà associée à un joueur. Rechargez la page.',
   unauthorized: 'Votre place n’a pas pu être retrouvée dans ce navigateur.',
-  conflict: 'Le salon a changé. Vérifiez votre statut et réessayez.',
+  conflict: 'Le salon a changé. Vérifiez les factions et votre statut, puis réessayez.',
   unavailable: 'Le serveur n’a pas pu terminer cette demande.',
+  'faction-taken': 'Cette faction est déjà prise. Choisissez une faction disponible.',
+  'faction-required': 'Choisissez une faction avant de vous déclarer prêt.',
 };
+const factionStatus = { available: 'Disponible', yours: 'Votre faction', taken: 'Prise' };
+type LobbyIntent = Omit<Extract<LobbyAction, { type: 'set-ready' }>, 'actionId' | 'expectedRevision'>
+  | Omit<Extract<LobbyAction, { type: 'select-faction' }>, 'actionId' | 'expectedRevision'>;
 const storageKey = (code: string) => `ww:seat:${code}`;
 const queryCode = new URLSearchParams(location.search).get('salon') ?? '';
 const initialCode = roomCode.safeParse(queryCode);
@@ -42,6 +47,23 @@ function invitation(code: string) {
   const url = new URL(location.pathname, location.origin);
   url.searchParams.set('salon', code);
   return url.href;
+}
+
+function journalEntry(item: LobbyView['journal'][number], players: LobbyView['players']) {
+  if (item.type === 'factions-enabled') {
+    const count = item.resetReadyCount;
+    return <>Le choix de faction est disponible.{count === 1 ? ' Un siège est repassé non prêt.'
+      : count > 1 ? ` ${count} sièges sont repassés non prêts.` : ''}</>;
+  }
+  const actor = players.find((p) => p.id === item.actorId)?.name ?? 'Un joueur';
+  if (item.type === 'select-faction') {
+    const choice = item.previousFaction
+      ? `a remplacé ${FACTION_NAMES[item.previousFaction]} par ${FACTION_NAMES[item.faction]}.`
+      : `a choisi ${FACTION_NAMES[item.faction]}.`;
+    return <><strong>{actor}</strong> {choice}{item.wasReady && ' Son siège est repassé non prêt.'}</>;
+  }
+  const change = item.type === 'joined' ? 'a rejoint le salon.' : item.ready ? 'est prêt.' : 'a retiré son statut prêt.';
+  return <><strong>{actor}</strong> {change}</>;
 }
 
 function App() {
@@ -135,12 +157,12 @@ function App() {
   }
 
   const me = view?.players.find((player) => player.id === view.you);
-  function setReady(ready: boolean, expectedRevision: number) {
+  function sendAction(intent: LobbyIntent, expectedRevision: number) {
     void request(async () => {
       const reply = await socket.emitWithAck('lobby:action', {
-        actionId: actionId(), type: 'set-ready', ready, expectedRevision,
+        ...intent, actionId: actionId(), expectedRevision,
       });
-      if (!reply.ok) return setError(messages[reply.error]);
+      if (!reply.ok) return setError(reply.error === 'invalid' ? 'Cette action n’est pas reconnue par le serveur.' : messages[reply.error]);
       receive(reply.value);
     });
   }
@@ -155,7 +177,7 @@ function App() {
       <p className="connection" data-online={connection === 'online'} role="status">{connectionLabel}</p>
     </header>
 
-    {error && <p className="feedback" role="alert">{error}</p>}
+    {!view && error && <p className="feedback" role="alert">{error}</p>}
     {notice && <p className="feedback" role="status">{notice}</p>}
 
     {!view ? <section className="panel entry" aria-labelledby="entry">
@@ -175,11 +197,12 @@ function App() {
         <div className="section-title"><h2 id="players">Joueurs</h2><span>{view.players.length} / {MAX_PLAYERS}</span></div>
         <ul className="players">
           {view.players.map((p) => <li key={p.id}>
-            <span><strong>{p.name}</strong>{p.id === view.hostId && <small>Hôte</small>}{p.id === view.you && <small>Vous</small>}</span>
+            <span><strong>{p.name}</strong>{p.id === view.hostId && <small>Hôte</small>}{p.id === view.you && <small>Vous</small>}
+              <span className="player-faction">{p.faction ? FACTION_NAMES[p.faction] : 'Sans faction'}</span>
+            </span>
             <span className="badge" data-ready={p.ready}>{p.ready ? 'Prêt' : 'En attente'}</span>
           </li>)}
         </ul>
-        {me && <button disabled={disabled} onClick={() => setReady(!me.ready, view.revision)}>{me.ready ? 'Retirer mon statut prêt' : 'Je suis prêt'}</button>}
       </section>
 
       <section className="panel" aria-labelledby="invite">
@@ -192,13 +215,33 @@ function App() {
         }}>Copier le lien</button>}
       </section>
 
+      <section className="panel" aria-labelledby="factions">
+        <h2 id="factions">Votre faction</h2>
+        <p>Choisissez une faction pour vous déclarer prêt. Si vous en changez, vous devrez confirmer à nouveau votre statut.</p>
+        {error && <p className="feedback" role="alert">{error}</p>}
+        <ul className="factions" aria-live="polite">
+          {view.factions.map(({ id, status }) => {
+            const blocked = disabled || status === 'taken';
+            return <li key={id}>
+              <button type="button" className="secondary" aria-pressed={status === 'yours'}
+                aria-describedby={`status-${id}`} aria-disabled={blocked}
+                onClick={() => { if (!blocked) sendAction({ type: 'select-faction', faction: id }, view.revision); }}>
+                {FACTION_NAMES[id]}
+              </button>
+              <span className="badge" id={`status-${id}`}>{factionStatus[status]}</span>
+            </li>;
+          })}
+        </ul>
+        {me && <button disabled={disabled || !view.canSetReady}
+          onClick={() => sendAction({ type: 'set-ready', ready: !me.ready }, view.revision)}>
+          {me.ready ? 'Retirer mon statut prêt' : 'Je suis prêt'}
+        </button>}
+      </section>
+
       <section className="panel journal" aria-labelledby="journal">
         <h2 id="journal">Journal du salon</h2>
-        <ol reversed>
-          {view.journal.slice().reverse().map((item) => {
-            const actor = view.players.find((p) => p.id === item.actorId)?.name;
-            return <li key={item.revision}><strong>{actor}</strong> {item.type === 'joined' ? 'a rejoint le salon.' : item.ready ? 'est prêt.' : 'a retiré son statut prêt.'}</li>;
-          })}
+        <ol reversed tabIndex={0} aria-labelledby="journal">
+          {view.journal.slice().reverse().map((item) => <li key={item.revision}>{journalEntry(item, view.players)}</li>)}
         </ol>
       </section>
     </div>}

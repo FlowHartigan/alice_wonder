@@ -3,7 +3,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import type { ZodType } from 'zod';
 import { viewFor } from '@wonderland/game-engine';
-import { createInput, joinInput, credentials, readyInput } from '@wonderland/shared';
+import { createInput, joinInput, credentials, lobbyAction } from '@wonderland/shared';
 import type { ClientEvents, LobbyState, Reply, ServerEvents } from '@wonderland/shared';
 import { openStore } from './store.ts';
 import type { Seat } from './store.ts';
@@ -83,7 +83,7 @@ export function makeServer(options: { database: string; webRoot?: string; public
       }
       return { ok: true, value: bind(state, playerId) };
     }));
-    socket.on('lobby:action', handler(readyInput, (action) => {
+    socket.on('lobby:action', handler(lobbyAction, (action) => {
       const seat = socket.data.seat;
       if (!seat) return { ok: false, error: 'unauthorized' };
       const result = store.action(seat, action);

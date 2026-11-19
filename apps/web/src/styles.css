@@ -33,13 +33,18 @@ input { display: block; width: 100%; margin-top: .35rem; padding: .6rem; border:
 button { border: 1px solid transparent; background: #f1c774; color: #201521; padding: .55rem .85rem; font-weight: 700; cursor: pointer; }
 button:not(:disabled):hover { background: #ffda93; }
 button.secondary { background: transparent; border-color: #8d769a; color: #fbeddc; }
-button.secondary:not(:disabled):hover { background: #453551; }
+button.secondary:not(:disabled):not([aria-disabled=true]):hover { background: #453551; }
 button:disabled { opacity: .55; cursor: default; }
 :focus-visible { outline: 2px solid #f1c774; outline-offset: 3px; }
-.section-title, .players li { display: flex; justify-content: space-between; gap: .5rem; align-items: center; }
-.players { list-style: none; padding: 0; margin: 1rem 0; }
+.section-title, .players li, .factions li { display: flex; justify-content: space-between; gap: .5rem; align-items: center; }
+.players, .factions { list-style: none; padding: 0; margin: 1rem 0; }
 .players li { border-top: 1px solid #473650; padding: .6rem 0; }
 .players li span:first-child, .journal li { overflow-wrap: anywhere; }
+.player-faction { display: block; color: #decce5; font-size: .9rem; }
+.factions li + li { margin-top: .45rem; }
+.factions button { flex: 1; text-align: start; }
+.factions button[aria-pressed=true] { border-color: #f1c774; }
+.factions button[aria-disabled=true] { cursor: default; }
 .badge { flex: none; }
 small { color: #decce5; margin-inline-start: .25rem; }
 .code { font-family: ui-monospace, monospace; font-size: 1.5rem; letter-spacing: .14em; color: #f1c774; }
