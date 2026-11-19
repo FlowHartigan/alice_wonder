@@ -28,10 +28,13 @@ const readyInput = z.strictObject({
 const factionInput = z.strictObject({
   actionId: id, type: z.literal('select-faction'), faction: factionId, expectedRevision: z.int().nonnegative(),
 });
-export const lobbyAction = z.discriminatedUnion('type', [readyInput, factionInput]);
+const firstPlayerInput = z.strictObject({
+  actionId: id, type: z.literal('select-first-player'), firstPlayerId: id, expectedRevision: z.int().nonnegative(),
+});
+export const lobbyAction = z.discriminatedUnion('type', [readyInput, factionInput, firstPlayerInput]);
 export const errorCodes = [
   'invalid', 'room-not-found', 'room-full', 'already-seated', 'unauthorized', 'conflict', 'unavailable',
-  'faction-taken', 'faction-required',
+  'faction-taken', 'faction-required', 'host-required', 'seat-not-found',
 ] as const;
 export type ErrorCode = (typeof errorCodes)[number];
 
@@ -49,7 +52,7 @@ export type LobbyStateV1 = z.infer<typeof lobbyStateV1>;
 const playerV2 = playerV1.extend({ faction: factionId.nullable() }).refine(
   (player) => !player.ready || player.faction !== null, 'Un siège prêt doit avoir une faction',
 );
-const lobbyEvent = z.discriminatedUnion('type', [
+const eventsV2 = [
   ...eventsV1,
   z.strictObject({
     revision: z.int().positive(), type: z.literal('select-faction'), actorId: id,
@@ -59,20 +62,37 @@ const lobbyEvent = z.discriminatedUnion('type', [
     revision: z.int().positive(), type: z.literal('factions-enabled'),
     resetReadyCount: z.int().nonnegative().max(MAX_PLAYERS),
   }),
-]);
-export const lobbyState = lobbyStateV1.extend({
-  version: z.literal(2), players: z.array(playerV2).min(1).max(MAX_PLAYERS),
-  journal: z.array(lobbyEvent).max(JOURNAL_LIMIT),
-}).refine(({ players }) => {
+] as const;
+const factionsAreUnique = ({ players }: { players: { faction: FactionId | null }[] }) => {
   const chosen = players.flatMap(({ faction }) => faction === null ? [] : [faction]);
   return new Set(chosen).size === chosen.length;
-}, 'Chaque faction ne peut appartenir qu’à un siège');
+};
+const uniqueFactionMessage = 'Chaque faction ne peut appartenir qu’à un siège';
+const lobbyWithFactions = lobbyStateV1.extend({ players: z.array(playerV2).min(1).max(MAX_PLAYERS) });
+export const lobbyStateV2 = lobbyWithFactions.extend({
+  version: z.literal(2), journal: z.array(z.discriminatedUnion('type', eventsV2)).max(JOURNAL_LIMIT),
+}).refine(factionsAreUnique, uniqueFactionMessage);
+export type LobbyStateV2 = z.infer<typeof lobbyStateV2>;
+
+const lobbyEvent = z.discriminatedUnion('type', [
+  ...eventsV2,
+  z.strictObject({ revision: z.int().positive(), type: z.literal('select-first-player'), actorId: id, firstPlayerId: id }),
+  z.strictObject({ revision: z.int().positive(), type: z.literal('first-player-cleared') }),
+]);
+// During restoration only, allow a well-formed reference to a seat no longer on the roster.
+export const lobbySnapshot = lobbyWithFactions.extend({
+  version: z.literal(3), firstPlayerId: id.nullable(), journal: z.array(lobbyEvent).max(JOURNAL_LIMIT),
+}).refine(factionsAreUnique, uniqueFactionMessage);
+export const lobbyState = lobbySnapshot.refine(({ firstPlayerId, players }) => (
+  firstPlayerId === null || players.some(({ id }) => id === firstPlayerId)
+), { message: 'Le premier joueur doit avoir un siège dans le salon', path: ['firstPlayerId'] });
 export type LobbyState = z.infer<typeof lobbyState>;
 export type LobbyAction = z.infer<typeof lobbyAction>;
 export type Session = z.infer<typeof credentials>;
 export type LobbyView = Omit<LobbyState, 'version'> & {
   you: string;
   canSetReady: boolean;
+  canSelectFirstPlayer: boolean;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };
 export type Reply<T> = { ok: true; value: T } | { ok: false; error: ErrorCode };

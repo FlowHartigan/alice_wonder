@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { createLobby, joinLobby, applyLobbyAction, migrateLobbyV1 } from '@wonderland/game-engine';
-import { lobbyState, lobbyStateV1 } from '@wonderland/shared';
+import { createLobby, joinLobby, applyLobbyAction, migrateLobbyV1, migrateLobbyV2, normalizeFirstPlayer } from '@wonderland/game-engine';
+import { lobbySnapshot, lobbyState, lobbyStateV1, lobbyStateV2 } from '@wonderland/shared';
 import type { LobbyAction, LobbyState, Reply, Session } from '@wonderland/shared';
 
 export type Seat = { code: string; playerId: string };
@@ -35,24 +35,38 @@ export function openStore(path: string) {
     }
   }
 
-  function migrateSnapshotsToV2() {
+  function restoreSnapshots(version: 1 | 2 | 3) {
     const rows = db.prepare('SELECT code, snapshot FROM lobbies').all();
     for (const row of rows) {
-      const old = lobbyStateV1.parse(JSON.parse(String(row.snapshot)));
-      if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v1');
-      save(migrateLobbyV1(old));
+      const raw: unknown = JSON.parse(String(row.snapshot));
+      if (version === 1) {
+        const old = lobbyStateV1.parse(raw);
+        if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v1');
+        writeSnapshot(lobbyStateV2.parse(migrateLobbyV1(old)));
+      } else if (version === 2) {
+        const old = lobbyStateV2.parse(raw);
+        if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v2');
+        save(migrateLobbyV2(old));
+      } else {
+        const snapshot = lobbySnapshot.parse(raw);
+        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v3');
+        const restored = normalizeFirstPlayer(snapshot);
+        if (restored !== snapshot) save(restored);
+      }
     }
-    // Keep the original session hashes and accepted action fingerprints. A replay returns the
-    // current state without applying a pre-migration intent again, including set-ready:true.
-    db.exec('PRAGMA user_version = 2');
   }
 
   try {
     transaction(() => {
       const version = db.prepare('PRAGMA user_version').get()?.user_version;
       if (version === 0) db.exec(migration1);
-      if (version === 0 || version === 1) migrateSnapshotsToV2();
-      else if (version !== 2) throw new Error('Version de base non prise en charge');
+      if (version === 0 || version === 1) restoreSnapshots(1);
+      if (version === 0 || version === 1 || version === 2) {
+        restoreSnapshots(2);
+        // Preserve sessions and successful action fingerprints through both steps.
+        db.exec('PRAGMA user_version = 3');
+      } else if (version === 3) restoreSnapshots(3);
+      else throw new Error('Version de base non prise en charge');
     });
   } catch (error) {
     db.close();
@@ -64,10 +78,12 @@ export function openStore(path: string) {
     return row ? lobbyState.parse(JSON.parse(String(row.snapshot))) : undefined;
   }
 
+  function writeSnapshot(state: { code: string }) {
+    db.prepare('UPDATE lobbies SET snapshot = ? WHERE code = ?').run(JSON.stringify(state), state.code);
+  }
+
   function save(state: LobbyState) {
-    db.prepare('UPDATE lobbies SET snapshot = ? WHERE code = ?').run(
-      JSON.stringify(lobbyState.parse(state)), state.code,
-    );
+    writeSnapshot(lobbyState.parse(state));
   }
 
   function admit(state: LobbyState, playerId: string) {
@@ -83,8 +99,8 @@ export function openStore(path: string) {
         let code: string;
         do { code = randomBytes(4).toString('hex').toUpperCase(); } while (load(code));
         const playerId = randomUUID();
-        const state = createLobby(code, { id: playerId, name });
-        db.prepare('INSERT INTO lobbies VALUES (?, ?)').run(code, JSON.stringify(lobbyState.parse(state)));
+        const state = lobbyState.parse(createLobby(code, { id: playerId, name }));
+        db.prepare('INSERT INTO lobbies VALUES (?, ?)').run(code, JSON.stringify(state));
         return admit(state, playerId);
       });
     },
@@ -103,8 +119,10 @@ export function openStore(path: string) {
       const row = db.prepare('SELECT player_id FROM sessions WHERE code = ? AND token_hash = ?').get(
         session.code, hashToken(session.token),
       );
-      const state = row && load(session.code);
-      return row && state ? { state, playerId: String(row.player_id) } : undefined;
+      if (!row) return;
+      const state = load(session.code);
+      const playerId = String(row.player_id);
+      if (state?.players.some(({ id }) => id === playerId)) return { state, playerId };
     },
     action(seat: Seat, action: LobbyAction): Reply<{ state: LobbyState; changed: boolean }> {
       return transaction(() => {
@@ -115,7 +133,8 @@ export function openStore(path: string) {
           'SELECT intent FROM accepted_actions WHERE code = ? AND player_id = ? AND action_id = ?',
         ).get(...args);
         // Preserve the v1 encoding for set-ready so accepted_actions still deduplicates it.
-        const parameter = action.type === 'set-ready' ? action.ready : action.faction;
+        const parameter = action.type === 'set-ready' ? action.ready
+          : action.type === 'select-faction' ? action.faction : action.firstPlayerId;
         const intent = `${action.type}:${parameter}:${action.expectedRevision}`;
         if (previous) return previous.intent === intent
           ? { ok: true, value: { state, changed: false } }
