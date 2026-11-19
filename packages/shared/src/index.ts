@@ -149,12 +149,19 @@ export type LobbyState = z.infer<typeof lobbyState>;
 export type LobbyAction = z.infer<typeof lobbyAction>;
 export type Session = z.infer<typeof credentials>;
 export type TeaTableSetupView = { openChairs: number; activeBlockers: ('4J' | '5J')[] };
+// Public to admitted seats in setup only; not a balance or an active turn.
+export type FirstTeaSetupView = { playerId: string; turn: number; plannedShards: number }[];
 export type LobbyView = Pick<LobbyState, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players' | 'journal'> & {
   you: string;
   canSetReady: boolean;
   canSelectFirstPlayer: boolean;
   launch: { blockers: LaunchBlocker[] } | null;
-  preparation: { gameId: string; teaTable: TeaTableSetupView; regionScores: RegionScoresSetupView } | null;
+  preparation: {
+    gameId: string;
+    teaTable: TeaTableSetupView;
+    regionScores: RegionScoresSetupView;
+    firstTeaPreview: FirstTeaSetupView;
+  } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };
 export type Reply<T> = { ok: true; value: T } | { ok: false; error: ErrorCode };

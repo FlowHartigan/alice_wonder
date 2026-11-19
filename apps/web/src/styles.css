@@ -51,6 +51,10 @@ button:disabled { opacity: .55; cursor: default; }
 small { color: #decce5; margin-inline-start: .25rem; }
 .code { font-family: ui-monospace, monospace; font-size: 1.5rem; letter-spacing: .14em; color: #f1c774; }
 .feedback { padding: .55rem .8rem; background: #392942; border-inline-start: 3px solid #f1c774; }
+.first-tea-preview { width: 100%; border-collapse: collapse; margin-bottom: 1.25rem; }
+.first-tea-preview caption { text-align: start; font-weight: 700; padding-bottom: .35rem; }
+.first-tea-preview th, .first-tea-preview td { text-align: start; padding: .35rem .25rem; border-bottom: 1px solid #614971; }
+.first-tea-preview td { overflow-wrap: anywhere; }
 .board-preview h3 { margin: 0; font-size: 1.1rem; }
 .board-preview-image { position: relative; container-type: inline-size; }
 .board-preview-image img { display: block; width: 100%; height: auto; }

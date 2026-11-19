@@ -2,6 +2,8 @@
 
 Ce prototype permet de créer un salon privé, d'inviter jusqu'à quatre autres joueurs et de partager les choix, les statuts prêts et le journal en temps réel. L'hôte désigne le premier joueur selon le critère du thé, puis peut lancer la préparation lorsque les 2 à 5 sièges sont prêts et ont chacun une faction distincte. Le lancement fige ces choix et ferme les admissions, mais les joueurs admis peuvent toujours reprendre leur place. En préparation, ils voient le [plateau central FR](LICENSES.md#plateau-central-fr) en lecture seule, les chaises bloquées selon l'effectif figé et les cinq marqueurs Score de Région tirés une seule fois par le serveur. Un tableau donne les noms des Régions et les PV des rounds I, II et III. À deux, la Région et son marqueur ne seront retirés qu'à une étape ultérieure, selon la Quête. Aucune carte n'est installée : la mise en place complète et la partie jouable restent à venir.
 
+Les sièges admis voient aussi un aperçu de l'ordre prévu du premier Thé, en tournant depuis J1 dans l'ordre des sièges, et des Éclats de départ prévus pour chacun (dont 0 pour J5 à cinq joueurs). Aucun Éclat n'est encore crédité et le Thé n'a pas commencé. Cet aperçu est recalculé à la reprise, sans modifier la sauvegarde.
+
 ## Démarrer en local
 
 Prérequis : Node.js 24 ou plus récent et npm. Sous PowerShell, utilisez `npm.cmd` si `npm` est bloqué par la politique d'exécution.
@@ -27,7 +29,7 @@ npm.cmd start
 2. Créer le salon et partager le lien (ou l'adresse et le code) avec le second ordinateur, sur le même réseau.
 3. Rejoindre le salon, choisir une faction disponible, cliquer « Je suis prêt » et vérifier les changements chez l'hôte. Recharger la page du second joueur : même place, même faction, même statut, même journal.
 4. Vérifier qu'aucun premier joueur n'est désigné à l'arrivée. Après accord de la table sur la personne ayant bu du thé le plus récemment, l'hôte choisit son siège dans « Premier joueur ». Recharger les deux pages : le choix est identique et seul l'hôte peut le modifier.
-5. Quand tout le monde est prêt, cliquer « Lancer la préparation » côté hôte. Les deux navigateurs voient les sièges, leurs factions et J1 dans le panneau de préparation. L'aperçu présente 11 chaises ouvertes, 4J et 5J bloquées et les mêmes cinq marqueurs Score de Région, sur l'image et dans le tableau accessible avec `Tab`. Un troisième profil ne peut plus rejoindre ; les deux profils déjà admis retrouvent les mêmes placements au rechargement du lien.
+5. Quand tout le monde est prêt, cliquer « Lancer la préparation » côté hôte. Si l'invité a été désigné, les deux navigateurs voient l'invité en J1 avec 2 Éclats prévus et l'hôte en J2 avec 1, même si l'hôte occupe le siège 1. Le plateau présente 11 chaises ouvertes, 4J et 5J bloquées et les mêmes cinq marqueurs Score de Région, sur l'image et dans le tableau accessible avec `Tab`. Un troisième profil ne peut plus rejoindre ; les deux profils déjà admis retrouvent les mêmes aperçus au rechargement du lien.
 
 SQLite enregistre l'état dans `.data/lobbies.sqlite` par défaut (dossier configurable avec `DATA_DIR`). Au redémarrage, ne changez pas l'adresse utilisée dans le navigateur ni le dossier de données pour reprendre le salon.
 

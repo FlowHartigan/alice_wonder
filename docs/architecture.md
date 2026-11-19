@@ -42,6 +42,11 @@ Le store relit le snapshot sous `BEGIN IMMEDIATE`, valide l'intention et écrit 
 - À la restauration v5, l'affectation doit être absente (valeur `null`) pour un salon ouvert, et complète pour un salon lancé : cinq Régions connues distinctes, cinq marqueurs connus distincts et un sixième connu différent. Contrairement à la migration v4, la restauration v5 n'effectue aucun tirage : un inventaire absent en préparation ou invalide est une erreur.
 - `preparation.regionScores` projette uniquement les cinq Régions (ID et nom FR) et leurs PV I/II/III, dans l'ordre du catalogue des Régions, ainsi qu'une indication de retrait différé à 2J. Le sixième marqueur, les IDs des pièces et le snapshot ne sont pas transmis. L'aperçu utilise des badges CSS et un tableau accessible, sans autre asset ni calcul de règle côté client.
 
+### Aperçu du premier Thé et des Éclats de départ (#63)
+
+- `firstTeaForSetup` dérive les rangs et Éclats prévus de `GameState.playerIds` en `setup` et de `firstPlayerId` dans la configuration figée (`WW-SETUP-005`). L'ordre d'admission n'est pas modifié : la rotation en partant de J1 est propre à la vue. Ni faction ni présence réseau n'est une entrée du calcul.
+- `viewFor` expose `preparation.firstTeaPreview` seulement à un siège de la partie, dans la vue de salon déjà réservée aux sessions admises. C'est une liste publique pour ces sièges : identifiant, rang et Éclats prévus ; React affiche ces valeurs et retrouve les noms dans la liste publique des sièges. Pas d'action, de tirage, d'événement, de changement de schéma ni d'écriture pour cet aperçu, y compris à la reprise et au rejeu. Il ne modifie ni l'ordre de la mise en place ni les ressources et ne désigne aucun joueur actif.
+
 ### État et actions de partie (#4)
 
 - **Format et cycle.** `GameState.version` identifie le format du snapshot (v1) ; `GameState.revision` augmente à chaque mutation et sert au futur stockage pour arbitrer les écritures concurrentes. `phase` distingue la préparation des phases de Thé et de Guerre, chacune associée à un round I–III ([`WW-FLOW-001`](../rules.md#2-structure-de-partie--validation-partielle), structure générale confirmée par la [fiche Lucky Duck Games FR `LKY WWR-R01-FR`](https://luckyduckgames.com/france/game/710-wonderland-s-war)). Décrire ces états n'autorise aucun passage entre eux.

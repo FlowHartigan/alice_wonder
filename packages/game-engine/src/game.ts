@@ -1,5 +1,5 @@
 import { gameAction, gameState } from '@wonderland/shared';
-import type { GamePhase, GameState, PrivateGameEvent, PrivatePlayerView, PublicGameView, TeaTableSetupView } from '@wonderland/shared';
+import type { FirstTeaSetupView, GamePhase, GameState, PrivateGameEvent, PrivatePlayerView, PublicGameView, TeaTableSetupView } from '@wonderland/shared';
 
 /** Server context resolved from an authenticated session, never from the command. */
 export type GameSeat = Readonly<{ gameId: string; playerId: string }>;
@@ -21,6 +21,27 @@ export function teaTableForSetup({ playerIds }: GameState): TeaTableSetupView {
   if (playerIds.length < 4) activeBlockers.push('4J');
   if (playerIds.length < 5) activeBlockers.push('5J');
   return { openChairs: 13 - activeBlockers.length, activeBlockers };
+}
+
+// WW-SETUP-005 — livret FR p. 3, p. 5 N (tableau), p. 6 et 11.
+const STARTING_SHARDS = {
+  2: [2, 1],
+  3: [3, 2, 1],
+  4: [3, 2, 2, 1],
+  5: [3, 2, 2, 1, 0],
+} as const;
+
+/** Uses the frozen seat order of a validated GameState, without applying step N. */
+export function firstTeaForSetup(
+  { phase, playerIds }: { phase: GamePhase; playerIds: readonly string[] }, firstPlayerId: string | null,
+): FirstTeaSetupView | null {
+  const count = playerIds.length;
+  if (phase.type !== 'setup' || firstPlayerId === null || (count !== 2 && count !== 3 && count !== 4 && count !== 5)) return null;
+  const start = playerIds.indexOf(firstPlayerId);
+  if (start === -1) return null;
+  return STARTING_SHARDS[count].map((plannedShards, index) => ({
+    playerId: playerIds[(start + index) % count], turn: index + 1, plannedShards,
+  }));
 }
 
 // In a validated snapshot, exact membership also rejects non-canonical session IDs.

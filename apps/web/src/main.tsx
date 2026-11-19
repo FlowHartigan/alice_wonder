@@ -237,6 +237,16 @@ function App() {
             {p.id === view.firstPlayerId && <span className="badge">Premier joueur (J1)</span>}
           </li>)}
         </ul>
+        <p id="first-tea-note">Les Éclats de départ sont prévus, pas encore crédités. Le premier Thé n’a pas commencé.</p>
+        <table className="first-tea-preview" aria-describedby="first-tea-note">
+          <caption>Aperçu — ordre prévu du premier Thé et Éclats de départ</caption>
+          <thead><tr><th scope="col">Rang</th><th scope="col">Joueur</th><th scope="col">Éclats prévus</th></tr></thead>
+          <tbody>{preparation.firstTeaPreview.map(({ playerId, turn, plannedShards }) => <tr key={playerId}>
+            <th scope="row">J{turn}</th>
+            <td>{seatLabel(view.players, view.players.findIndex(({ id }) => id === playerId))}</td>
+            <td>{plannedShards}</td>
+          </tr>)}</tbody>
+        </table>
         <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores} />
       </section> : <>
       <section className="panel" aria-labelledby="players">
