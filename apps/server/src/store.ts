@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { createLobby, joinLobby, applyLobbyAction } from '@wonderland/game-engine';
-import { lobbyState } from '@wonderland/shared';
+import { createLobby, joinLobby, applyLobbyAction, migrateLobbyV1 } from '@wonderland/game-engine';
+import { lobbyState, lobbyStateV1 } from '@wonderland/shared';
 import type { LobbyAction, LobbyState, Reply, Session } from '@wonderland/shared';
 
 export type Seat = { code: string; playerId: string };
@@ -35,11 +35,28 @@ export function openStore(path: string) {
     }
   }
 
-  const version = db.prepare('PRAGMA user_version').get()?.user_version;
-  if (version === 0) transaction(() => db.exec(migration1));
-  else if (version !== 1) {
+  function migrateSnapshotsToV2() {
+    const rows = db.prepare('SELECT code, snapshot FROM lobbies').all();
+    for (const row of rows) {
+      const old = lobbyStateV1.parse(JSON.parse(String(row.snapshot)));
+      if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v1');
+      save(migrateLobbyV1(old));
+    }
+    // Keep the original session hashes and accepted action fingerprints. A replay returns the
+    // current state without applying a pre-migration intent again, including set-ready:true.
+    db.exec('PRAGMA user_version = 2');
+  }
+
+  try {
+    transaction(() => {
+      const version = db.prepare('PRAGMA user_version').get()?.user_version;
+      if (version === 0) db.exec(migration1);
+      if (version === 0 || version === 1) migrateSnapshotsToV2();
+      else if (version !== 2) throw new Error('Version de base non prise en charge');
+    });
+  } catch (error) {
     db.close();
-    throw new Error('Version de base non prise en charge');
+    throw error;
   }
 
   function load(code: string): LobbyState | undefined {
@@ -97,7 +114,9 @@ export function openStore(path: string) {
         const previous = db.prepare(
           'SELECT intent FROM accepted_actions WHERE code = ? AND player_id = ? AND action_id = ?',
         ).get(...args);
-        const intent = `${action.type}:${action.ready}:${action.expectedRevision}`;
+        // Preserve the v1 encoding for set-ready so accepted_actions still deduplicates it.
+        const parameter = action.type === 'set-ready' ? action.ready : action.faction;
+        const intent = `${action.type}:${parameter}:${action.expectedRevision}`;
         if (previous) return previous.intent === intent
           ? { ok: true, value: { state, changed: false } }
           : { ok: false, error: 'conflict' };

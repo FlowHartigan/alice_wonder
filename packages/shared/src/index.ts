@@ -7,30 +7,74 @@ export const JOURNAL_LIMIT = 40;
 export const roomCode = z.string().trim().toUpperCase().regex(/^[A-F0-9]{8}$/);
 const playerName = z.string().trim().min(1).max(30).regex(/^[^\p{Cc}\p{Cf}]+$/u);
 const id = z.uuid();
+// WW-FACTION-001 — les cinq noms des Chefs du livret de base FR, p. 10–11.
+export const FACTION_NAMES = {
+  alice: 'Alice',
+  'chapelier-fou': 'Chapelier fou',
+  'reine-de-coeur': 'Reine de cœur',
+  jabberwocky: 'Jabberwocky',
+  'chat-du-cheshire': 'Chat du Cheshire',
+} as const;
+export type FactionId = keyof typeof FACTION_NAMES;
+export const FACTION_IDS: readonly FactionId[] = Object.keys(FACTION_NAMES) as FactionId[];
+const factionId = z.enum(FACTION_IDS);
+
 export const createInput = z.strictObject({ name: playerName });
 export const joinInput = createInput.extend({ code: roomCode });
 export const credentials = z.strictObject({ code: roomCode, token: z.string().regex(/^[\w-]{43}$/) });
-export const readyInput = z.strictObject({
+const readyInput = z.strictObject({
   actionId: id, type: z.literal('set-ready'), ready: z.boolean(), expectedRevision: z.int().nonnegative(),
 });
+const factionInput = z.strictObject({
+  actionId: id, type: z.literal('select-faction'), faction: factionId, expectedRevision: z.int().nonnegative(),
+});
+export const lobbyAction = z.discriminatedUnion('type', [readyInput, factionInput]);
 export const errorCodes = [
   'invalid', 'room-not-found', 'room-full', 'already-seated', 'unauthorized', 'conflict', 'unavailable',
+  'faction-taken', 'faction-required',
 ] as const;
 export type ErrorCode = (typeof errorCodes)[number];
 
-const publicPlayer = z.strictObject({ id, name: playerName, ready: z.boolean() });
-const lobbyEvent = z.discriminatedUnion('type', [
+const playerV1 = z.strictObject({ id, name: playerName, ready: z.boolean() });
+const eventsV1 = [
   z.strictObject({ revision: z.int().positive(), type: z.literal('joined'), actorId: id }),
   z.strictObject({ revision: z.int().positive(), type: z.literal('set-ready'), actorId: id, ready: z.boolean() }),
-]);
-export const lobbyState = z.strictObject({
+] as const;
+export const lobbyStateV1 = z.strictObject({
   version: z.literal(1), code: roomCode, hostId: id, revision: z.int().positive(),
-  players: z.array(publicPlayer).min(1).max(MAX_PLAYERS), journal: z.array(lobbyEvent).max(JOURNAL_LIMIT),
+  players: z.array(playerV1).min(1).max(MAX_PLAYERS),
+  journal: z.array(z.discriminatedUnion('type', eventsV1)).max(JOURNAL_LIMIT),
 });
+export type LobbyStateV1 = z.infer<typeof lobbyStateV1>;
+const playerV2 = playerV1.extend({ faction: factionId.nullable() }).refine(
+  (player) => !player.ready || player.faction !== null, 'Un siège prêt doit avoir une faction',
+);
+const lobbyEvent = z.discriminatedUnion('type', [
+  ...eventsV1,
+  z.strictObject({
+    revision: z.int().positive(), type: z.literal('select-faction'), actorId: id,
+    faction: factionId, previousFaction: factionId.nullable(), wasReady: z.boolean(),
+  }),
+  z.strictObject({
+    revision: z.int().positive(), type: z.literal('factions-enabled'),
+    resetReadyCount: z.int().nonnegative().max(MAX_PLAYERS),
+  }),
+]);
+export const lobbyState = lobbyStateV1.extend({
+  version: z.literal(2), players: z.array(playerV2).min(1).max(MAX_PLAYERS),
+  journal: z.array(lobbyEvent).max(JOURNAL_LIMIT),
+}).refine(({ players }) => {
+  const chosen = players.flatMap(({ faction }) => faction === null ? [] : [faction]);
+  return new Set(chosen).size === chosen.length;
+}, 'Chaque faction ne peut appartenir qu’à un siège');
 export type LobbyState = z.infer<typeof lobbyState>;
-export type LobbyAction = z.infer<typeof readyInput>;
+export type LobbyAction = z.infer<typeof lobbyAction>;
 export type Session = z.infer<typeof credentials>;
-export type LobbyView = Omit<LobbyState, 'version'> & { you: string };
+export type LobbyView = Omit<LobbyState, 'version'> & {
+  you: string;
+  canSetReady: boolean;
+  factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
+};
 export type Reply<T> = { ok: true; value: T } | { ok: false; error: ErrorCode };
 type Ack<T> = (reply: Reply<T>) => void;
 type Admission = { session: Session; view: LobbyView };

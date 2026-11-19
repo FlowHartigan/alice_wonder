@@ -5,7 +5,7 @@ Référentiel : [`rules.md`](../rules.md). Les pages renvoient au livret FR du j
 | Domaine | Identifiants | Source FR / prochaine vérification | Documentation | Implémenté | Testé | Validé |
 |---|---|---|---|---|---|---|
 | Inventaire | [`WW-SETUP-001`](../rules.md#ww-setup-001--inventaire) | p. 2–3, 8 et 22 ; fiche éditeur ; rapprocher lots, réserves et pièces écartées | Documentée | — | — | Validée : totaux de référence, pas le catalogue par exemplaire |
-| Factions au départ | [`WW-SETUP-002`](../rules.md#ww-setup-002--choix-des-factions) | p. 2–3, 5 A, 8, 10–11, 21 ; contrôler lots, face et Poison sur les quatre effectifs | Documentée | — | — | Validée : choix, face et dotations A, pas les fiches des plateaux |
+| Factions au départ | [`WW-SETUP-002`](../rules.md#ww-setup-002--choix-des-factions) | p. 5 A et inventaire p. 2–3 pour l'exclusivité ; p. 8, 10–11, 21 pour la recette de préparation | Documentée | Exclusivité en salon ([#5](https://github.com/FlowHartigan/alice_wonder/issues/5)) ; pas de mise en place | [Intégration et navigateur](#recette-du-choix-de-faction-en-salon) | Validée : choix exclusif pour #5 ; face et dotations A documentées en #2, pas les fiches des plateaux |
 | Ressources initiales | [`WW-SETUP-003`](../rules.md#ww-setup-003--ressources-individuelles-et-quêtes) | p. 3, 5 B–M, 21 ; décompter sacs et pistes, suivre une Quête refusée, contrôler l'enchaînement B–M | Documentée | — | — | Validée : opérations établies B–M ; ordre entre joueurs à J et mains de Pari après K à 3–4J non validés |
 | Plateau | [`WW-SETUP-004`](../rules.md#ww-setup-004--plateau-et-réserves-communes) | p. 2–5, 8–9, 21 et plateau FR ; vérifier marché mixte, chaises et Premier combat | Documentée | — | — | Validée : préparation commune et exception régionale ; ordre du filtrage du marché 2J non validé |
 | Initiative et Éclats | [`WW-SETUP-005`](../rules.md#ww-setup-005--initiative-et-éclats-du-round-i) | p. 3, 5 N (tableau visuel), 6, 11 ; [décision hôte](decisions.md#décisions) ; simuler J1 non hôte après M | Documentée | — | — | Validée : round I, hors absence d'accord ; pas de validation de l'initiative des rounds suivants |
@@ -16,13 +16,21 @@ Référentiel : [`rules.md`](../rules.md). Les pages renvoient au livret FR du j
 | Arrêt des pioches à 2J | [`WW-WAR-004`](../rules.md#ww-war-004--arrêt-des-pioches-à-2j) | FR p. 12–13, 21–22 et 24 ; [recette #47](#recette-documentaire-de-larrêt-des-pioches-à-2j) | Documentée | Critère spécial seul ([#49](https://github.com/FlowHartigan/alice_wonder/issues/49)) ; cycle à intégrer ([#22](https://github.com/FlowHartigan/alice_wonder/issues/22)) | [Tests unitaires du critère spécial](#tests-unitaires-du-critère-spécial-à-2j) | Validée pour le projet : première pioche et seul combattant sous le seuil établis sur livret ; égalité et priorité après abandon arbitrées en #47, sans confirmation de l'éditeur |
 | Sacs et jetons | `WW-BAG-001` à `005` | p. 2–5, 8–9, 12–15, 22–23 ; inventaire et priorités | Partiel · À documenter | — | — | — |
 | Régions et Châteaux | `WW-MAP-001` à `004` | p. 4, 8, 12, 14, 21–22 ; relever le plateau et ses adjacences | Partiel · À documenter | — | — | — |
-| Factions | `WW-FACTION-001` à `004` | p. 5, 10–11, 21, 23 et plateaux recto/verso | Partiel · Fiches à documenter | — | — | — |
+| Liste des factions | [`WW-FACTION-001`](../rules.md#ww-faction-001--liste-des-factions) | p. 10–11, « Pouvoirs des Chefs » (noms) | Documentée | Cinq noms FR en salon | [Intégration et navigateur](#recette-du-choix-de-faction-en-salon) | Validée : liste uniquement |
+| Pouvoirs et capacités de faction | `WW-FACTION-002` à `004` | p. 8, 10–11, 15, 21–23 et plateaux recto/verso | Partiel · Fiches à documenter | — | — | — |
 | Cartes, Quêtes, Forge | `WW-CARD-001` à `002`, `WW-QUEST-001`, `WW-UPGRADE-001` | p. 8–9, 14–15, 20, 22–23 ; inventorier les textes et pictogrammes | Partiel · Catalogue à documenter | — | — | — |
 | Score et fin | `WW-SCORE-001` à `002`, `WW-END-001` à `002` | p. 14–15, 21–22 ; confirmer les sources des PV et égalités persistantes | Partiel · À documenter | — | — | — |
 | Exceptions 2J | [`WW-COUNT-001`](../rules.md#ww-count-001--exceptions-à-deux-joueurs) | p. 4–5 et 21 ; contrôler Région, Quêtes, Premier combat, exclusions, faces, ressources et cube | Documentée | — | — | Validée : préparation établie seulement ; ni ordre du filtre ni données individuelles non établies ; jeu hors jalon |
 | Comparaison 2–5J | [`WW-COUNT-002`](../rules.md#ww-count-002--comparaison-des-effectifs) | p. 2–5 et 21, plateau FR ; recalculer les quatre installations | Documentée | — | — | Validée : bilans aux étapes indiquées, pas les usages ultérieurs ni les quantités non ventilées |
 
-Le statut prêt du salon est une fonctionnalité de l'application, sans identifiant de règle officielle.
+Le statut prêt, le changement de choix et l'arbitrage des demandes réseau sont des conventions du salon, sans identifiant de règle officielle.
+
+## Recette du choix de faction en salon
+
+[#5](https://github.com/FlowHartigan/alice_wonder/issues/5) : contrôle du [livret officiel FR](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416), p. 5 A (choix et prise du lot), p. 2–3 (un lot par faction) et p. 10–11 (cinq noms). Aucun plateau physique examiné ; les capacités, faces et dotations ne font pas partie de l'implémentation.
+
+- [`tests/lobby.test.ts`](../tests/lobby.test.ts) : deux demandes concurrentes à la même révision, un seul succès, refus explicite et disponibilité diffusée ; cinq sièges avec cinq factions ; choix réservé à son siège, prêt sans faction refusé, changement et libération, sélection identique et rejeu, reprise après reconnexion et redémarrage, migration v1 et annulation si un snapshot est illisible.
+- [`tests/lobby.e2e.ts`](../tests/lobby.e2e.ts) : invitation Chromium → Firefox, cinq noms FR et disponibilités accessibles, sélection au clavier, synchronisation du statut et du journal, changement et réattribution, reprise de la même place au rechargement.
 
 ## Recette documentaire de la mise en place
 
