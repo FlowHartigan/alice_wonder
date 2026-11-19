@@ -51,5 +51,27 @@ button:disabled { opacity: .55; cursor: default; }
 small { color: #decce5; margin-inline-start: .25rem; }
 .code { font-family: ui-monospace, monospace; font-size: 1.5rem; letter-spacing: .14em; color: #f1c774; }
 .feedback { padding: .55rem .8rem; background: #392942; border-inline-start: 3px solid #f1c774; }
+.board-preview h3 { margin: 0; font-size: 1.1rem; }
+.board-preview-image { position: relative; container-type: inline-size; }
+.board-preview-image img { display: block; width: 100%; height: auto; }
+.board-blocker {
+  position: absolute;
+  top: 24.1%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  inline-size: min(6.8%, 2.5rem);
+  border: 1px solid #fff5e9;
+  border-radius: .25rem;
+  box-shadow: 0 0 0 1px #291224;
+  background: #481831;
+  color: #fff5e9;
+  font-size: clamp(.56rem, 2.7cqi, .95rem);
+  font-weight: 800;
+  text-align: center;
+}
+/* Centers of the printed 4/5 markers on the upper edge of the official FR tea table. */
+.board-blocker[data-chair="4J"] { left: 55.4%; }
+.board-blocker[data-chair="5J"] { left: 63.1%; }
+.board-credit { color: #decce5; font-size: .85rem; }
 footer { text-align: center; font-size: .85rem; margin: 1.5rem 0; color: #e0cde5; }
 @media (max-width: 42rem) { .lobby { grid-template-columns: 1fr; } }

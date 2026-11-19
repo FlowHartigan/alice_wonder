@@ -1,6 +1,6 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, preparationBlockers } from '@wonderland/shared';
 import type { LobbyAction, LobbyState, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, Reply } from '@wonderland/shared';
-import { initializeGame } from './game.ts';
+import { initializeGame, teaTableForSetup } from './game.ts';
 
 export * from './battle.ts';
 export * from './game.ts';
@@ -109,7 +109,9 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
     firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
     launch: hostInLobby ? { blockers: preparationBlockers(state) } : null,
-    preparation: state.game ? { gameId: state.game.gameId } : null,
+    preparation: state.game?.phase.type === 'setup'
+      ? { gameId: state.game.gameId, teaTable: teaTableForSetup(state.game) }
+      : null,
     players: state.players.map(({ id, name, ready, faction }) => ({ id, name, ready, faction })),
     canSetReady: !state.game && state.players.some(({ id, faction }) => id === playerId && faction !== null),
     factions: FACTION_IDS.map((id) => {

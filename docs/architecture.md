@@ -31,6 +31,11 @@ Le store relit le snapshot sous `BEGIN IMMEDIATE`, valide l'intention et écrit 
 
 **Restauration.** Pour un salon ouvert seulement, un UUID J1 orphelin est normalisé : `null`, nouvelle révision et événement `first-player-cleared`, sans choix de remplacement. Une future transition de retrait dans un salon ouvert devra réutiliser cette normalisation. Pour un salon lancé, les préconditions de configuration, la correspondance des sièges et l'événement unique de lancement à la dernière révision doivent rester valides ; aucune réparation ni réouverture n'est tentée. Un snapshot illisible ou incohérent annule la transaction de démarrage.
 
+### Aperçu du plateau central et chaises du Thé (#54)
+
+- En `setup`, le moteur dérive la disposition de `GameState.playerIds`, la liste figée des sièges admis, jamais des connexions. `viewFor` ajoute seulement `preparation.teaTable` (`openChairs`, `activeBlockers`) à la vue existante des sièges autorisés. Le calcul est identique à chaque projection, y compris après restauration d'une préparation v4 : aucune nouvelle donnée persistée, migration ou révision.
+- React rend le résumé textuel et superpose les badges fournis par le serveur sur une image proportionnelle non interactive. Vite importe directement le [WebP officiel](../LICENSES.md#plateau-central-fr), sans fichier source dupliqué ; l'image est un asset statique, pas une donnée de partie. Aucun calcul de règle côté client. Cet aperçu ne lance pas le Thé et ne remplace ni la préparation commune complète (#12) ni le futur plateau interactif (#15).
+
 ### État et actions de partie (#4)
 
 - **Format et cycle.** `GameState.version` identifie le format du snapshot (v1) ; `GameState.revision` augmente à chaque mutation et sert au futur stockage pour arbitrer les écritures concurrentes. `phase` distingue la préparation des phases de Thé et de Guerre, chacune associée à un round I–III ([`WW-FLOW-001`](../rules.md#2-structure-de-partie--validation-partielle), structure générale confirmée par la [fiche Lucky Duck Games FR `LKY WWR-R01-FR`](https://luckyduckgames.com/france/game/710-wonderland-s-war)). Décrire ces états n'autorise aucun passage entre eux.

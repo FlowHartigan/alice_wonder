@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { credentials, FACTION_NAMES, MAX_PLAYERS, MIN_PLAYERS, roomCode } from '@wonderland/shared';
 import type { ClientEvents, ErrorCode, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
+import { BoardPreview } from './BoardPreview.tsx';
 import './styles.css';
 
 const messages: Record<ErrorCode, string> = {
@@ -98,7 +99,8 @@ function App() {
   const [notice, setNotice] = useState('');
   const preparationTitle = useRef<HTMLHeadingElement>(null);
   const wasInLobby = useRef(false);
-  const preparing = Boolean(view?.preparation);
+  const preparation = view?.preparation;
+  const preparing = Boolean(preparation);
 
   function receive(next: LobbyView) {
     setView((previous) => previous && previous.code === next.code && previous.revision > next.revision ? previous : next);
@@ -223,7 +225,7 @@ function App() {
         </div>
       </form>
     </section> : <div className="lobby">
-      {preparing ? <section className="panel preparation" aria-labelledby="preparation">
+      {preparation ? <section className="panel preparation" aria-labelledby="preparation">
         <h2 id="preparation" ref={preparationTitle} tabIndex={-1}>Préparation de la partie</h2>
         <p><strong>Admissions fermées.</strong> Les sièges et la configuration sont figés. Les joueurs déjà admis peuvent reprendre leur place avec ce même lien.</p>
         <p>Salon <strong>{view.code}</strong> · {view.players.length} joueurs</p>
@@ -235,7 +237,7 @@ function App() {
             {p.id === view.firstPlayerId && <span className="badge">Premier joueur (J1)</span>}
           </li>)}
         </ul>
-        <p>La mise en place du plateau n’est pas encore disponible.</p>
+        <BoardPreview teaTable={preparation.teaTable} />
       </section> : <>
       <section className="panel" aria-labelledby="players">
         <div className="section-title"><h2 id="players">Joueurs</h2><span>{view.players.length} / {MAX_PLAYERS}</span></div>

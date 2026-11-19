@@ -10,9 +10,10 @@ import type { Socket } from 'socket.io-client';
 import { makeServer } from '../apps/server/src/server.ts';
 import { applyLobbyAction, createLobby, joinLobby, launchPreparation, normalizeFirstPlayer } from '@wonderland/game-engine';
 import { FACTION_IDS, gameState, lobbyState } from '@wonderland/shared';
-import type { ClientEvents, FactionId, LobbyState, LobbyView, Reply, ServerEvents } from '@wonderland/shared';
+import type { ClientEvents, FactionId, LobbyAction, LobbyState, LobbyView, Reply, ServerEvents } from '@wonderland/shared';
 
-const clients: Socket<ServerEvents, ClientEvents>[] = [];
+type LobbySocket = Socket<ServerEvents, ClientEvents>;
+const clients: LobbySocket[] = [];
 let server: ReturnType<typeof makeServer> | undefined;
 let directory: string | undefined;
 
@@ -27,7 +28,7 @@ async function start(database = ':memory:') {
 }
 
 async function connect(url: string) {
-  const socket: Socket<ServerEvents, ClientEvents> = io(url, {
+  const socket: LobbySocket = io(url, {
     autoConnect: false, reconnection: false, forceNew: true, transports: ['websocket'], ackTimeout: 2000,
   });
   clients.push(socket);
@@ -40,13 +41,43 @@ async function connect(url: string) {
   return socket;
 }
 
-function nextUpdate(socket: Socket<ServerEvents, ClientEvents>) {
+function nextUpdate(socket: LobbySocket) {
   return new Promise<LobbyView>((resolve) => socket.once('lobby:update', resolve));
 }
 
 function success<T>(reply: Reply<T>): T {
   if (!reply.ok) throw new Error(reply.error);
   return reply.value;
+}
+
+// Acknowledging an action on its sender does not drain earlier broadcasts on other sockets.
+async function actionWithUpdates(actor: LobbySocket, recipients: LobbySocket[], action: LobbyAction) {
+  const revision = action.expectedRevision + 1;
+  const cancel = new AbortController();
+  const signal = AbortSignal.any([cancel.signal, AbortSignal.timeout(2000)]);
+  try {
+    const updates = Promise.all(recipients.map((socket) => new Promise<LobbyView>((resolve, reject) => {
+      function cleanup() {
+        socket.off('lobby:update', onUpdate);
+        signal.removeEventListener('abort', onAbort);
+      }
+      function onUpdate(view: LobbyView) {
+        if (view.revision !== revision) return;
+        cleanup();
+        resolve(view);
+      }
+      function onAbort() {
+        cleanup();
+        reject(new Error(`Diffusion de la révision ${revision} absente sur le socket ${socket.id}`, { cause: signal.reason }));
+      }
+      socket.on('lobby:update', onUpdate);
+      signal.addEventListener('abort', onAbort, { once: true });
+    })));
+    const [view, received] = await Promise.all([actor.emitWithAck('lobby:action', action).then(success), updates]);
+    return { view, received };
+  } finally {
+    cancel.abort();
+  }
 }
 
 const selectFaction = (faction: FactionId, expectedRevision: number) =>
@@ -79,9 +110,8 @@ async function readyTable(url: string) {
     edits.push({ faction, ready });
   }
   const choice = selectFirstPlayer(joined.view.you, view.revision);
-  const guestReady = nextUpdate(guest);
-  const ready = success(await host.emitWithAck('lobby:action', choice));
-  await guestReady;
+  const { view: ready, received: [guestReady] } = await actionWithUpdates(host, [guest], choice);
+  expect(guestReady).toMatchObject({ you: joined.view.you, revision: choice.expectedRevision + 1, firstPlayerId: choice.firstPlayerId });
   return { host, guest, created, joined, ready, choice, edits };
 }
 
@@ -218,14 +248,14 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
       you: joined.view.you, revision: ready.revision + 1, players: ready.players, firstPlayerId: joined.view.you,
       preparation: prepared.preparation, canSetReady: false, canSelectFirstPlayer: false, launch: null,
     });
-    expect(prepared.preparation).toEqual({ gameId: expect.any(String) });
+    expect(prepared.preparation).toEqual({ gameId: expect.any(String), teaTable: { openChairs: 11, activeBlockers: ['4J', '5J'] } });
     expect(guestView).not.toHaveProperty('game');
     expect(JSON.stringify(guestView)).not.toContain(created.session.token);
     expect(JSON.stringify(guestView)).not.toContain(joined.session.token);
     expect(prepared.journal.filter(({ type }) => type === 'launch-preparation')).toHaveLength(1);
     const persisted = databaseContents(db);
     const snapshot = lobbyState.parse(JSON.parse(String(persisted.rooms[0].snapshot)));
-    expect(gameState.parse(snapshot.game)).toEqual({ ...prepared.preparation, version: 1, revision: 0,
+    expect(gameState.parse(snapshot.game)).toEqual({ gameId: prepared.preparation?.gameId, version: 1, revision: 0,
       phase: { type: 'setup' }, playerIds: ready.players.map(({ id }) => id), history: [], decisions: [] });
     expect(persisted.sessions).toEqual(before.sessions);
     expect(persisted.receipts).toHaveLength(before.receipts.length + 1);
@@ -260,6 +290,58 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
     expect(success(await hostRestored.emitWithAck('lobby:action', requests[winner]))).toEqual(prepared);
     expect(databaseContents(db)).toEqual(persisted);
   } finally { db.close(); }
+});
+
+it.each([
+  { count: 2, openChairs: 11, activeBlockers: ['4J', '5J'] },
+  { count: 3, openChairs: 11, activeBlockers: ['4J', '5J'] },
+  { count: 4, openChairs: 12, activeBlockers: ['5J'] },
+  { count: 5, openChairs: 13, activeBlockers: [] },
+])('projette les mêmes chaises à $count sièges au lancement, à la reconnexion et après restauration', async ({ count, ...teaTable }) => {
+  const database = tempDatabase();
+  const url = await start(database);
+  const seats = await Promise.all(Array.from({ length: count }, () => connect(url)));
+  const [host, ...guests] = seats;
+  const created = success(await host.emitWithAck('lobby:create', { name: 'Camille' }));
+  const { code } = created.session;
+  const sessions = [created.session];
+  const seatIds = [created.view.you];
+  let view = created.view;
+  for (const [i, guest] of guests.entries()) {
+    const joined = success(await guest.emitWithAck('lobby:join', { code, name: `Invité ${i + 1}` }));
+    sessions.push(joined.session);
+    seatIds.push(joined.view.you);
+    view = joined.view;
+  }
+  for (const [i, socket] of seats.entries()) {
+    view = success(await socket.emitWithAck('lobby:action', selectFaction(FACTION_IDS[i], view.revision)));
+    view = success(await socket.emitWithAck('lobby:action', setReady(true, view.revision)));
+  }
+  const firstPlayerId = created.view.you;
+  const choice = selectFirstPlayer(firstPlayerId, view.revision);
+  const { view: configured, received: choices } = await actionWithUpdates(host, seats, choice);
+  const choiceRevision = choice.expectedRevision + 1;
+  for (const [i, current] of choices.entries()) {
+    expect(current).toMatchObject({ code, you: seatIds[i], revision: choiceRevision, firstPlayerId, preparation: null });
+  }
+  const request = launch(configured.revision);
+  const { view: prepared, received: allViews } = await actionWithUpdates(host, seats, request);
+  expect(allViews[0]).toEqual(prepared);
+  expect(prepared.preparation).toEqual({ gameId: expect.any(String), teaTable });
+  for (const [i, current] of allViews.entries()) {
+    expect(current).toMatchObject({ code, you: seatIds[i], revision: choiceRevision + 1, firstPlayerId });
+    expect(current.preparation).toEqual(prepared.preparation);
+    expect(current).not.toHaveProperty('game');
+  }
+  for (const guest of guests) guest.disconnect();
+  expect(success(await host.emitWithAck('lobby:resume', created.session))).toEqual(prepared);
+  const returned = await connect(url);
+  expect(success(await returned.emitWithAck('lobby:resume', sessions[1]))).toEqual(allViews[1]);
+  await stop();
+  const restoredUrl = await start(database);
+  const restored = await Promise.all(sessions.map(async (session) =>
+    success(await (await connect(restoredUrl)).emitWithAck('lobby:resume', session))));
+  expect(restored).toEqual(allViews);
 });
 
 it.each(['simultanément', 'après admission'] as const)('arbitre un lancement %s face à une nouvelle admission', async (order) => {
