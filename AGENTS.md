@@ -91,7 +91,8 @@ Monorepo TypeScript :
 
 Stack préférée :
 - **Frontend :** React + TypeScript + Vite.
-- **Rendu du plateau :** Phaser 3 pour scènes, animations et interactions 2D ; React pour menus, lobbies, panneaux et overlays. Ne pas dupliquer l'état métier entre les deux.
+- **Rendu et interactions :** Phaser 3 reste prévu pour le rendu et les interactions du futur plateau 2D ; React pour menus, lobbies, panneaux et overlays. Ne pas dupliquer l'état métier entre les deux.
+- **Animations visuelles :** Anime.js côté client (`apps/web`) pour les cartes, les pions, les transitions et les éléments d'interface. Pour le plateau, Anime.js peut interpoler des valeurs de présentation que Phaser affiche, sans devenir un second moteur de rendu.
 - **Backend :** Node.js + TypeScript + Socket.IO.
 - **Validation :** Zod aux frontières réseau et stockage.
 - **Persistance :** PostgreSQL et ORM compatible, avec migrations versionnées.
@@ -112,6 +113,7 @@ Ces choix sont des préférences initiales : explique toute proposition de chang
 - Préserve les invariants : pas de jetons dupliqués, pas de pertes silencieuses, pas de scores non justifiés, pas d'actions hors phase.
 - Les données enregistrées doivent être versionnées afin de pouvoir faire évoluer les sauvegardes.
 - Aucun composant visuel ne calcule lui-même le résultat d'un combat ou le droit à une action.
+- Les animations respectent `prefers-reduced-motion` : préférer un mouvement réduit ou une présentation statique. Elles ne modifient ni ne retardent les mises à jour de l'état autoritaire, n'influencent pas les décisions du serveur et ne déterminent, ne retardent ni ne bloquent la disponibilité des actions autorisées.
 
 ## 7. Modèle de jeu
 

@@ -1,9 +1,15 @@
 # Architecture
 
-- **`apps/web`** : Vite et React affichent les vues reçues et émettent des intentions. Le futur plateau Phaser rendra la même vue, sans état de règles parallèle.
+- **`apps/web`** : Vite et React affichent les vues reçues et émettent des intentions. Phaser 3 reste prévu pour le rendu et les interactions du futur plateau 2D, à partir des mêmes vues et sans état de règles parallèle.
 - **`apps/server`** : Node.js et Socket.IO attachent chaque connexion à une place et valident les messages avec Zod. Le serveur déduit l'acteur de la session, applique une transition pure, sauvegarde, puis publie une projection par destinataire. En développement Vite relaie `/socket.io` ; le prototype compilé utilise une origine commune.
 - **`packages/game-engine`** : création du salon, admission, validation de la révision et changement de statut. Les règles de partie seront ajoutées ici par identifiant `WW-…`, avec des entrées aléatoires injectées pour les tests.
 - **`packages/shared`** : schémas des messages et snapshots, contrats Socket.IO et types des vues. Le snapshot stocké et la réponse réseau sont distincts ; des vues publiques et privées seront séparées à l'arrivée des mains, sacs et objectifs.
+
+### Animations côté client
+
+Anime.js (`animejs`, dans `apps/web`) est réservé aux animations visuelles des cartes, des pions, des transitions et des éléments d'interface. Sur le plateau, Anime.js peut interpoler des valeurs de présentation, comme une position ou une opacité ; Phaser reste seul responsable du rendu et des interactions 2D.
+
+Respecter `prefers-reduced-motion` en préférant un mouvement réduit ou une présentation statique. Les animations ne modifient ni ne retardent les mises à jour de l'état autoritaire et n'influencent pas les décisions du serveur. La disponibilité des actions autorisées ne dépend jamais du démarrage, de la progression ou de la fin d'une animation.
 
 ### Salon et reprise
 
