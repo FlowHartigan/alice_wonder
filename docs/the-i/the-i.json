@@ -1,0 +1,216 @@
+{
+  "id": "the-i",
+  "round": 1,
+  "statut": "Référence documentaire non exécutable, non validée pour l’édition FR",
+  "conformiteTirageFr": "à confirmer pour toutes les définitions",
+  "regles": ["WW-CARD-001", "WW-CARD-002", "WW-TEA-002", "WW-COUNT-001"],
+  "manifestVisuels": "visuels.json",
+  "sourceExemplaires": "bgg-7130325",
+  "versoCommunTts": "tts-dos-the-i",
+  "definitions": [
+    {
+      "id": "the-i-29405", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 1 unité", "Gain : 1 Soldat faible", "Pioche : 1 Quête"],
+      "rectoReference": "tts-carte-29405-recto"
+    },
+    {
+      "id": "the-i-29400", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 2 unités", "Jet du dé Éclat", "Gain : 2 Soldats faibles"],
+      "rectoReference": "tts-carte-29400-recto"
+    },
+    {
+      "id": "the-i-29410", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 3 unités", "Gain : 1 Soldat faible", "Défausse : 1 Éclat"],
+      "rectoReference": "tts-carte-29410-recto"
+    },
+    {
+      "id": "the-i-29408", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 1 unité", "Gain : 1 Flamant rose faible", "Pioche : 1 Quête"],
+      "rectoReference": "tts-carte-29408-recto", "pageExempleLivretFr": 11
+    },
+    {
+      "id": "the-i-29403", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 2 unités", "Jet du dé Éclat", "Gain : 2 Flamants roses faibles"],
+      "rectoReference": "tts-carte-29403-recto"
+    },
+    {
+      "id": "the-i-29412", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 3 unités", "Gain : 1 Flamant rose faible", "Défausse : 1 Éclat"],
+      "rectoReference": "tts-carte-29412-recto"
+    },
+    {
+      "id": "the-i-29407", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 1 unité", "Gain : 1 Créature faible", "Pioche : 1 Quête"],
+      "rectoReference": "tts-carte-29407-recto"
+    },
+    {
+      "id": "the-i-29402", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 2 unités", "Jet du dé Éclat", "Gain : 2 Créatures faibles"],
+      "rectoReference": "tts-carte-29402-recto"
+    },
+    {
+      "id": "the-i-29411", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 3 unités", "Gain : 1 Créature faible", "Défausse : 1 Éclat"],
+      "rectoReference": "tts-carte-29411-recto", "pageExempleLivretFr": 21
+    },
+    {
+      "id": "the-i-marche-de-allie-faible", "occurrences": 1, "type": "corrompue",
+      "commun": ["Affectation : 1 unité", "Marché : choix de 1 carte Pays des Merveilles"],
+      "siDeAccepte": ["Jet du dé Éclat", "Gain : 1 Allié faible au choix"],
+      "rectoReference": "livret-the-i-corrompue", "pageExempleLivretFr": 9
+    },
+    {
+      "id": "the-i-29406", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 1 unité", "Gain : 1 Tour rouge faible", "Pioche : 1 Quête"],
+      "rectoReference": "tts-carte-29406-recto"
+    },
+    {
+      "id": "the-i-29401", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 2 unités", "Jet du dé Éclat", "Gain : 2 Tours rouges faibles"],
+      "rectoReference": "tts-carte-29401-recto"
+    },
+    {
+      "id": "the-i-29414", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 3 unités", "Gain : 1 Tour rouge faible", "Défausse : 1 Éclat"],
+      "rectoReference": "tts-carte-29414-recto", "pageExempleLivretFr": 7
+    },
+    {
+      "id": "the-i-29409", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 1 unité", "Gain : 1 Rose faible", "Pioche : 1 Quête"],
+      "rectoReference": "tts-carte-29409-recto", "pageExempleLivretFr": 3
+    },
+    {
+      "id": "the-i-29404", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 2 unités", "Jet du dé Éclat", "Gain : 2 Roses faibles"],
+      "rectoReference": "tts-carte-29404-recto", "pageExempleLivretFr": 11
+    },
+    {
+      "id": "the-i-29413", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 3 unités", "Gain : 1 Rose faible", "Défausse : 1 Éclat"],
+      "rectoReference": "tts-carte-29413-recto"
+    },
+    {
+      "id": "the-i-29419", "occurrences": 1, "type": "simple",
+      "commun": ["Marché : choix de 1 carte Pays des Merveilles", "Gain : 1 Allié faible au choix"],
+      "rectoReference": "tts-carte-29419-recto"
+    },
+    {
+      "id": "the-i-29424", "occurrences": 1, "type": "simple",
+      "commun": ["Jet du dé Éclat", "Déblocage : 1 capacité de Faction au choix", "Gain : 1 Allié faible au choix"],
+      "rectoReference": "tts-carte-29424-recto"
+    },
+    {
+      "id": "the-i-29422", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 2 unités", "Déblocage : 1 capacité de Faction au choix"],
+      "rectoReference": "tts-carte-29422-recto"
+    },
+    {
+      "id": "the-i-capacite-de-unites", "occurrences": 1, "type": "corrompue",
+      "commun": ["Affectation : 2 unités", "Déblocage : 1 capacité de Faction au choix"],
+      "siDeAccepte": ["Jet du dé Éclat", "Affectation supplémentaire : 2 unités"],
+      "rectoReference": "bgg-7130325-the-i-l2c10"
+    },
+    {
+      "id": "the-i-29426", "occurrences": 1, "type": "divisee",
+      "commun": ["Affectation : 2 unités"],
+      "haut": ["Force du Chef : +1", "Pioche : 1 Quête"],
+      "bas": ["Déblocage : 1 capacité de Faction au choix"],
+      "rectoReference": "tts-carte-29426-recto"
+    },
+    {
+      "id": "the-i-29421", "occurrences": 1, "type": "divisee",
+      "commun": ["Affectation : 1 unité"],
+      "haut": ["Déblocage : 1 capacité de Faction au choix", "Défausse : 1 Éclat"],
+      "bas": ["Marché : choix de 1 carte Pays des Merveilles", "Défausse : 1 Éclat"],
+      "rectoReference": "tts-carte-29421-recto"
+    },
+    {
+      "id": "the-i-29420", "occurrences": 2, "type": "divisee",
+      "commun": ["Affectation : 2 unités"],
+      "haut": ["Marché : choix de 1 carte Pays des Merveilles"],
+      "bas": ["Déblocage : 1 capacité de Faction au choix"],
+      "rectoReference": "tts-carte-29420-recto", "pageExempleLivretFr": 9
+    },
+    {
+      "id": "the-i-29418", "occurrences": 1, "type": "divisee",
+      "commun": ["Affectation : 3 unités"],
+      "haut": ["Gain : 1 jeton Forge", "Défausse : 1 Éclat"],
+      "bas": ["Marché : choix de 1 carte Pays des Merveilles"],
+      "rectoReference": "tts-carte-29418-recto"
+    },
+    {
+      "id": "the-i-29417", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 1 unité", "Gain : 1 jeton Forge", "Force du Chef : +1"],
+      "rectoReference": "tts-carte-29417-recto"
+    },
+    {
+      "id": "the-i-29415", "occurrences": 1, "type": "simple",
+      "commun": ["Gain : 1 jeton Forge", "Force du Chef : +1", "Défausse : 1 Éclat"],
+      "rectoReference": "tts-carte-29415-recto"
+    },
+    {
+      "id": "the-i-29425", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 1 unité", "Gain : 1 jeton Forge", "Gain : 1 Allié faible au choix"],
+      "rectoReference": "tts-carte-29425-recto"
+    },
+    {
+      "id": "the-i-29416", "occurrences": 1, "type": "simple",
+      "commun": ["Affectation : 3 unités", "Jet du dé Éclat", "Gain : 1 jeton Forge", "Force du Chef : +1"],
+      "rectoReference": "tts-carte-29416-recto"
+    },
+    {
+      "id": "the-i-29429", "occurrences": 1, "type": "corrompue",
+      "commun": ["Affectation : 2 unités", "Gain : 1 Allié faible au choix"],
+      "siDeAccepte": ["Jet du dé Éclat", "Pioche : 1 Quête"],
+      "rectoReference": "tts-carte-29429-recto"
+    }
+  ],
+  "exemplaires": [
+    {"id": "the-i-bgg-l1c1", "rangee": 1, "colonne": 1, "definition": "the-i-29405", "rectosTtsConcordants": ["tts-carte-29405-recto"]},
+    {"id": "the-i-bgg-l1c2", "rangee": 1, "colonne": 2, "definition": "the-i-29400", "rectosTtsConcordants": ["tts-carte-29400-recto"]},
+    {"id": "the-i-bgg-l1c3", "rangee": 1, "colonne": 3, "definition": "the-i-29410", "rectosTtsConcordants": ["tts-carte-29410-recto"]},
+    {"id": "the-i-bgg-l1c4", "rangee": 1, "colonne": 4, "definition": "the-i-29408", "rectosTtsConcordants": ["tts-carte-29408-recto"]},
+    {"id": "the-i-bgg-l1c5", "rangee": 1, "colonne": 5, "definition": "the-i-29403", "rectosTtsConcordants": ["tts-carte-29403-recto"]},
+    {"id": "the-i-bgg-l1c6", "rangee": 1, "colonne": 6, "definition": "the-i-29412", "rectosTtsConcordants": ["tts-carte-29412-recto"]},
+    {"id": "the-i-bgg-l1c7", "rangee": 1, "colonne": 7, "definition": "the-i-29407", "rectosTtsConcordants": ["tts-carte-29407-recto"]},
+    {"id": "the-i-bgg-l1c8", "rangee": 1, "colonne": 8, "definition": "the-i-29402", "rectosTtsConcordants": ["tts-carte-29402-recto"]},
+    {"id": "the-i-bgg-l1c9", "rangee": 1, "colonne": 9, "definition": "the-i-29411", "rectosTtsConcordants": ["tts-carte-29411-recto"]},
+    {"id": "the-i-bgg-l1c10", "rangee": 1, "colonne": 10, "definition": "the-i-marche-de-allie-faible", "rectosTtsConcordants": []},
+    {"id": "the-i-bgg-l2c1", "rangee": 2, "colonne": 1, "definition": "the-i-29406", "rectosTtsConcordants": ["tts-carte-29406-recto"]},
+    {"id": "the-i-bgg-l2c2", "rangee": 2, "colonne": 2, "definition": "the-i-29401", "rectosTtsConcordants": ["tts-carte-29401-recto"]},
+    {"id": "the-i-bgg-l2c3", "rangee": 2, "colonne": 3, "definition": "the-i-29414", "rectosTtsConcordants": ["tts-carte-29414-recto"]},
+    {"id": "the-i-bgg-l2c4", "rangee": 2, "colonne": 4, "definition": "the-i-29409", "rectosTtsConcordants": ["tts-carte-29409-recto"]},
+    {"id": "the-i-bgg-l2c5", "rangee": 2, "colonne": 5, "definition": "the-i-29404", "rectosTtsConcordants": ["tts-carte-29404-recto"]},
+    {"id": "the-i-bgg-l2c6", "rangee": 2, "colonne": 6, "definition": "the-i-29413", "rectosTtsConcordants": ["tts-carte-29413-recto"]},
+    {"id": "the-i-bgg-l2c7", "rangee": 2, "colonne": 7, "definition": "the-i-29419", "rectosTtsConcordants": ["tts-carte-29419-recto"]},
+    {"id": "the-i-bgg-l2c8", "rangee": 2, "colonne": 8, "definition": "the-i-29424", "rectosTtsConcordants": ["tts-carte-29424-recto"]},
+    {"id": "the-i-bgg-l2c9", "rangee": 2, "colonne": 9, "definition": "the-i-29422", "rectosTtsConcordants": ["tts-carte-29422-recto"]},
+    {"id": "the-i-bgg-l2c10", "rangee": 2, "colonne": 10, "definition": "the-i-capacite-de-unites", "rectosTtsConcordants": []},
+    {"id": "the-i-bgg-l3c1", "rangee": 3, "colonne": 1, "definition": "the-i-29426", "rectosTtsConcordants": ["tts-carte-29426-recto"]},
+    {"id": "the-i-bgg-l3c2", "rangee": 3, "colonne": 2, "definition": "the-i-29421", "rectosTtsConcordants": ["tts-carte-29421-recto"]},
+    {"id": "the-i-bgg-l3c3", "rangee": 3, "colonne": 3, "definition": "the-i-29420", "rectosTtsConcordants": ["tts-carte-29420-recto", "tts-carte-29423-recto"]},
+    {"id": "the-i-bgg-l3c4", "rangee": 3, "colonne": 4, "definition": "the-i-29420", "rectosTtsConcordants": ["tts-carte-29420-recto", "tts-carte-29423-recto"]},
+    {"id": "the-i-bgg-l3c5", "rangee": 3, "colonne": 5, "definition": "the-i-29418", "rectosTtsConcordants": ["tts-carte-29418-recto"]},
+    {"id": "the-i-bgg-l3c6", "rangee": 3, "colonne": 6, "definition": "the-i-29417", "rectosTtsConcordants": ["tts-carte-29417-recto"]},
+    {"id": "the-i-bgg-l3c7", "rangee": 3, "colonne": 7, "definition": "the-i-29415", "rectosTtsConcordants": ["tts-carte-29415-recto"]},
+    {"id": "the-i-bgg-l3c8", "rangee": 3, "colonne": 8, "definition": "the-i-29425", "rectosTtsConcordants": ["tts-carte-29425-recto"]},
+    {"id": "the-i-bgg-l3c9", "rangee": 3, "colonne": 9, "definition": "the-i-29416", "rectosTtsConcordants": ["tts-carte-29416-recto"]},
+    {"id": "the-i-bgg-l3c10", "rangee": 3, "colonne": 10, "definition": "the-i-29429", "rectosTtsConcordants": ["tts-carte-29429-recto"]}
+  ],
+  "comparaisonTts": {
+    "exemplairesConcordants": 28,
+    "definitionsSansEquivalentExactDansLeModule": ["the-i-marche-de-allie-faible", "the-i-capacite-de-unites"],
+    "variantesTtsSansEquivalentExactSurLaPhoto": [
+      {
+        "rectoReference": "tts-carte-29427-recto", "type": "corrompue",
+        "commun": ["Affectation : 1 unité", "Marché : choix de 1 carte Pays des Merveilles"],
+        "siDeAccepte": ["Jet du dé Éclat", "Affectation supplémentaire : 3 unités"]
+      },
+      {
+        "rectoReference": "tts-carte-29428-recto", "type": "corrompue",
+        "commun": ["Affectation : 1 unité", "Déblocage : 1 capacité de Faction au choix"],
+        "siDeAccepte": ["Jet du dé Éclat", "Gain : 1 Allié faible au choix"]
+      }
+    ]
+  }
+}
