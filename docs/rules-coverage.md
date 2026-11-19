@@ -12,7 +12,8 @@ Référentiel : [`rules.md`](../rules.md). Les pages renvoient au livret FR du j
 | Structure générale | `WW-FLOW-001` | p. 6, 15 | Documenté | — | — | — |
 | Transitions | `WW-FLOW-002` à `003` | p. 6–7, 15, 21 ; caler l'ordre et les cas de régions écartées | Partiel · À documenter | — | — | — |
 | Thé | `WW-TEA-001` à `006` | p. 6–11, 21–22 ; lister les effets, décisions et exceptions | Partiel · À documenter | — | — | — |
-| Guerre | `WW-WAR-001` à `009` | p. 12–19, 21–24 ; formaliser pioches/paris et égalités ; [arrêt à 2J](../rules.md#arrêt-du-combat-à-2j--questions-bloquantes) (`WW-WAR-004`, [#22](https://github.com/FlowHartigan/alice_wonder/issues/22)) | Partiel · À documenter | — | — | — |
+| Guerre | `WW-WAR-001` à `009` | p. 12–19, 21–24 ; formaliser pioches, abandons, paris et égalités ; voir le détail 2J ci-dessous | Partiel · À documenter | — | — | — |
+| Arrêt des pioches à 2J | [`WW-WAR-004`](../rules.md#arrêt-du-combat-à-2j--questions-bloquantes) | FR p. 12–13, 21–22 et 24 ; comparaison EN et Tim pour l'égalité ; [recette #44](#recette-documentaire-de-larrêt-des-pioches-à-2j) | Documentée | — | — | Partielle : première pioche et seul combattant sous le seuil ; égalité au seuil et priorité après abandon non validées, à ne pas coder dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22) |
 | Sacs et jetons | `WW-BAG-001` à `005` | p. 2–5, 8–9, 12–15, 22–23 ; inventaire et priorités | Partiel · À documenter | — | — | — |
 | Régions et Châteaux | `WW-MAP-001` à `004` | p. 4, 8, 12, 14, 21–22 ; relever le plateau et ses adjacences | Partiel · À documenter | — | — | — |
 | Factions | `WW-FACTION-001` à `004` | p. 5, 10–11, 21, 23 et plateaux recto/verso | Partiel · Fiches à documenter | — | — | — |
@@ -44,4 +45,19 @@ Conditions : paquet A (conseillé, pas obligatoire), marché simulé de deux Hab
 
 - **Matériel :** aucune inspection, mise en place physique, vérification du tirage ou comparaison d'encarts. La conformité de la boîte au PDF est supposée pour ce jalon. Restent à relever : composition exacte des lots, correspondances carte–pièces, ventilation faible/fort, nombre de Quêtes par Région et détails des cinq faces 2J (pistes et capacités). Le livret ne suffit pas à établir l'usage des Folie doubles excédentaires, ni l'adjacence créée ou non de part et d'autre d'une Région retirée pour les autres effets.
 - **Validation et revue :** aucun mélange ni tirage réel, aucune partie jouée et aucun moteur de mise en place testé. La contre-lecture indépendante à effectuer en revue de PR porte notamment sur la préparation 2J (étapes et exclusions, sans imposer l'ordre du filtre) et la désignation de J1 (critère officiel, décision hôte et distribution horaire).
-- **Combat hors jalon :** pour un combat déjà terminé au round II, Force finale 4 ne remplit pas le seuil de conquête, Force finale 5 le remplit. Ce contrôle de lecture ne permet pas de décider si le seul combattant à Force 4 doit continuer après la première pioche, ni s'il doit piocher alors qu'il démarre déjà à 5. Les [deux scénarios de `WW-WAR-004`](../rules.md#arrêt-du-combat-à-2j--questions-bloquantes) restent non validés dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22), sans comportement par défaut.
+- **Combat hors recette de préparation :** voir la recette distincte de `WW-WAR-004` ci-dessous.
+
+## Recette documentaire de l'arrêt des pioches à 2J
+
+[#44](https://github.com/FlowHartigan/alice_wonder/issues/44). Quatre cas déroulés sur papier au **round II (Résistance à 5)**, sans partie jouée ni test logiciel. Les pages ci-dessous sont celles du [livret FR](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416), sauf mention contraire. Pour les sources EN et la réponse de Tim, voir [`WW-WAR-004`](../rules.md#arrêt-du-combat-à-2j--questions-bloquantes).
+
+| Situation | Pioche ou fin du combat | Source et statut |
+|---|---|---|
+| Seul combattant, Force de départ 3 ; le premier jeton résolu l'amène à 4 et il reste en lice | Peut repiocher : être seul ne suffit pas pour arrêter le combat sous le seuil. | FR p. 21, **validé** pour la seule Résistance. |
+| Seul combattant, Force de départ 5 ou plus | Pioche et résolution complètes avant toute vérification d'arrêt par la Résistance ; pas d'abandon avant la résolution, ni de choix d'abandon si le combat prend déjà fin. | FR p. 12, p. 22 (FAQ), p. 24, lues avec p. 21 ; **ordre validé**, sans trancher l'égalité après résolution. |
+| Seul combattant, encore en lice à 5 après la première pioche | FR : arrêt à la lecture littérale. EN et Tim : la pioche peut continuer à égalité. | FR p. 21, EN v1.20 p. 21 et réponse de Tim ; **non validé pour le FR**. |
+| A seul en lice à 6, B a abandonné à 8 | A s'arrête si le seuil suffit ; A peut repiocher si la Force de B doit aussi être dépassée. B ne repioche pas et sa Force compte toujours. | FR p. 21 face aux p. 12–13 et 24 ; **priorité non validée**. |
+
+**Contrôle séparé des récompenses :** pour un combat *déjà terminé*, Force finale 4 = seuil de conquête non rempli ; Force finale 5 = seuil rempli (FR p. 21, [`WW-COUNT-001`](../rules.md#ww-count-001--exceptions-à-deux-joueurs)). Ce contrôle ne tranche pas l'arrêt à 5.
+
+**Suite pour [#22](https://github.com/FlowHartigan/alice_wonder/issues/22) :** ne coder ni l'arrêt à égalité ni la priorité après abandon tant qu'une clarification applicable à l'édition FR ou un arbitrage produit explicite et documenté n'est pas obtenu. Aucun changement d'implémentation ni de barème dans #44.
