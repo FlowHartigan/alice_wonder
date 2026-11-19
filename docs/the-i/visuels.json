@@ -1,0 +1,63 @@
+{
+  "id": "the-i-visuels",
+  "statut": "Référence documentaire non exécutable, non validée pour l’édition FR",
+  "droitsVisuels": {
+    "statut": "Usage web et publication à documenter",
+    "integration": false,
+    "publication": false
+  },
+  "sources": {
+    "bgg-7130325": {
+      "type": "photo communautaire",
+      "url": "https://boardgamegeek.com/image/7130325/wonderlands-war",
+      "datePublication": "2022-10-18",
+      "edition": "Exemplaire anglophone ; tirage non identifié"
+    },
+    "livret-fr": {
+      "type": "livret",
+      "url": "https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416",
+      "edition": "Lucky Duck Games LKY WWR-R01-FR (livret ; tirage non identifié)",
+      "pagesReleve": [3, 7, 8, 9, 11, 21]
+    },
+    "tts-2886627193": {
+      "type": "module communautaire Tabletop Simulator",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=2886627193",
+      "edition": "Module TTS anglophone ; tirage non vérifié"
+    }
+  },
+  "ressources": [
+    {"id": "tts-carte-29400-recto", "source": "tts-2886627193", "carte": 29400, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29401-recto", "source": "tts-2886627193", "carte": 29401, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29402-recto", "source": "tts-2886627193", "carte": 29402, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29403-recto", "source": "tts-2886627193", "carte": 29403, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29404-recto", "source": "tts-2886627193", "carte": 29404, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29405-recto", "source": "tts-2886627193", "carte": 29405, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29406-recto", "source": "tts-2886627193", "carte": 29406, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29407-recto", "source": "tts-2886627193", "carte": 29407, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29408-recto", "source": "tts-2886627193", "carte": 29408, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29409-recto", "source": "tts-2886627193", "carte": 29409, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29410-recto", "source": "tts-2886627193", "carte": 29410, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29411-recto", "source": "tts-2886627193", "carte": 29411, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29412-recto", "source": "tts-2886627193", "carte": 29412, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29413-recto", "source": "tts-2886627193", "carte": 29413, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29414-recto", "source": "tts-2886627193", "carte": 29414, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29415-recto", "source": "tts-2886627193", "carte": 29415, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29416-recto", "source": "tts-2886627193", "carte": 29416, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29417-recto", "source": "tts-2886627193", "carte": 29417, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29418-recto", "source": "tts-2886627193", "carte": 29418, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29419-recto", "source": "tts-2886627193", "carte": 29419, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29420-recto", "source": "tts-2886627193", "carte": 29420, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29421-recto", "source": "tts-2886627193", "carte": 29421, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29422-recto", "source": "tts-2886627193", "carte": 29422, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29423-recto", "source": "tts-2886627193", "carte": 29423, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29424-recto", "source": "tts-2886627193", "carte": 29424, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29425-recto", "source": "tts-2886627193", "carte": 29425, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29426-recto", "source": "tts-2886627193", "carte": 29426, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29427-recto", "source": "tts-2886627193", "carte": 29427, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29428-recto", "source": "tts-2886627193", "carte": 29428, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-carte-29429-recto", "source": "tts-2886627193", "carte": 29429, "face": "recto", "langue": "sans texte"},
+    {"id": "tts-dos-the-i", "source": "tts-2886627193", "face": "dos partagé", "langue": "à vérifier"},
+    {"id": "livret-the-i-corrompue", "source": "livret-fr", "page": 9, "face": "recto", "langue": "fr ou sans texte", "variante": "exemple du livret"},
+    {"id": "bgg-7130325-the-i-l2c10", "source": "bgg-7130325", "rangee": 2, "colonne": 10, "face": "recto", "langue": "non vérifiée", "variante": "recadrage photographique"}
+  ]
+}
