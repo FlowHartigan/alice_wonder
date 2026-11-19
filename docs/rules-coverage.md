@@ -13,7 +13,7 @@ Référentiel : [`rules.md`](../rules.md). Les pages renvoient au livret FR du j
 | Transitions | `WW-FLOW-002` à `003` | p. 6–7, 15, 21 ; caler l'ordre et les cas de régions écartées | Partiel · À documenter | — | — | — |
 | Thé | `WW-TEA-001` à `006` | p. 6–11, 21–22 ; lister les effets, décisions et exceptions | Partiel · À documenter | — | — | — |
 | Guerre | `WW-WAR-001` à `009` | p. 12–19, 21–24 ; formaliser pioches, abandons, paris et égalités ; voir le détail 2J ci-dessous | Partiel · À documenter | — | — | — |
-| Arrêt des pioches à 2J | [`WW-WAR-004`](../rules.md#arrêt-du-combat-à-2j--questions-bloquantes) | FR p. 12–13, 21–22 et 24 ; comparaison EN et Tim pour l'égalité ; [recette #44](#recette-documentaire-de-larrêt-des-pioches-à-2j) | Documentée | — | — | Partielle : première pioche et seul combattant sous le seuil ; égalité au seuil et priorité après abandon non validées, à ne pas coder dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22) |
+| Arrêt des pioches à 2J | [`WW-WAR-004`](../rules.md#ww-war-004--arrêt-des-pioches-à-2j) | FR p. 12–13, 21–22 et 24 ; [recette #47](#recette-documentaire-de-larrêt-des-pioches-à-2j) | Documentée | — | — | Validée pour le projet : première pioche et seul combattant sous le seuil établis sur livret ; égalité et priorité après abandon arbitrées en #47, sans confirmation de l'éditeur |
 | Sacs et jetons | `WW-BAG-001` à `005` | p. 2–5, 8–9, 12–15, 22–23 ; inventaire et priorités | Partiel · À documenter | — | — | — |
 | Régions et Châteaux | `WW-MAP-001` à `004` | p. 4, 8, 12, 14, 21–22 ; relever le plateau et ses adjacences | Partiel · À documenter | — | — | — |
 | Factions | `WW-FACTION-001` à `004` | p. 5, 10–11, 21, 23 et plateaux recto/verso | Partiel · Fiches à documenter | — | — | — |
@@ -49,15 +49,15 @@ Conditions : paquet A (conseillé, pas obligatoire), marché simulé de deux Hab
 
 ## Recette documentaire de l'arrêt des pioches à 2J
 
-[#44](https://github.com/FlowHartigan/alice_wonder/issues/44). Quatre cas déroulés sur papier au **round II (Résistance à 5)**, sans partie jouée ni test logiciel. Les pages ci-dessous sont celles du [livret FR](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416), sauf mention contraire. Pour les sources EN et la réponse de Tim, voir [`WW-WAR-004`](../rules.md#arrêt-du-combat-à-2j--questions-bloquantes).
+[#47](https://github.com/FlowHartigan/alice_wonder/issues/47), à la suite de [#44](https://github.com/FlowHartigan/alice_wonder/issues/44). Quatre cas d'arrêt ou de poursuite et un contrôle distinct des récompenses ont été déroulés sur papier au **round II (Résistance à 5)**, sans partie jouée ni test logiciel. Les pages citées sont celles du [livret FR `LKY WWR-R01-FR`](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416). Les deux cas arbitrés par le projet selon la p. 21 FR ne constituent ni un erratum ni une confirmation de l'éditeur.
 
 | Situation | Pioche ou fin du combat | Source et statut |
 |---|---|---|
-| Seul combattant, Force de départ 3 ; le premier jeton résolu l'amène à 4 et il reste en lice | Peut repiocher : être seul ne suffit pas pour arrêter le combat sous le seuil. | FR p. 21, **validé** pour la seule Résistance. |
-| Seul combattant, Force de départ 5 ou plus | Pioche et résolution complètes avant toute vérification d'arrêt par la Résistance ; pas d'abandon avant la résolution, ni de choix d'abandon si le combat prend déjà fin. | FR p. 12, p. 22 (FAQ), p. 24, lues avec p. 21 ; **ordre validé**, sans trancher l'égalité après résolution. |
-| Seul combattant, encore en lice à 5 après la première pioche | FR : arrêt à la lecture littérale. EN et Tim : la pioche peut continuer à égalité. | FR p. 21, EN v1.20 p. 21 et réponse de Tim ; **non validé pour le FR**. |
-| A seul en lice à 6, B a abandonné à 8 | A s'arrête si le seuil suffit ; A peut repiocher si la Force de B doit aussi être dépassée. B ne repioche pas et sa Force compte toujours. | FR p. 21 face aux p. 12–13 et 24 ; **priorité non validée**. |
+| Seul combattant, Force de départ 5 ou plus (`WW-WAR-003`) | La Force de départ ne déclenche pas l'arrêt : effectuer et résoudre entièrement la première pioche, puis vérifier l'arrêt (ex. départ à 5, jeton résolu à +1, arrêt à 6). L'abandon n'est possible que si le combat continue et qu'une nouvelle pioche est proposée. | **Chronologie établie en #44**, FR p. 12–13, 21–22 et 24. |
+| Seul combattant sans adversaire humain : Force de départ 3, puis 4 après résolution complète du premier jeton | Peut repiocher : 4 est en dessous de 5. | **Cas établi en #44**, FR p. 21. |
+| Seul combattant sans adversaire humain, encore en lice à 5 après résolution complète de la première pioche | Arrêt sans nouvelle pioche : 5 atteint le seuil. | **Égalité arbitrée en #47**, FR p. 21. |
+| A seul en lice à 6, B a abandonné à 8 | Arrêt sans nouvelle pioche pour A : 6 dépasse 5, même si A reste derrière B. B ne repioche pas et conserve 8 pour le classement ; il n'est pas en échec. | **Priorité du seuil arbitrée en #47**, FR p. 21 ; Force conservée, p. 13. |
 
-**Contrôle séparé des récompenses :** pour un combat *déjà terminé*, Force finale 4 = seuil de conquête non rempli ; Force finale 5 = seuil rempli (FR p. 21, [`WW-COUNT-001`](../rules.md#ww-count-001--exceptions-à-deux-joueurs)). Ce contrôle ne tranche pas l'arrêt à 5.
+**Contrôle séparé des récompenses :** pour un combat *déjà terminé*, Force finale 4 = seuil de conquête non rempli ; Force finale 5 = seuil rempli (FR p. 21, [`WW-COUNT-001`](../rules.md#ww-count-001--exceptions-à-deux-joueurs) et `WW-WAR-007`). Cette éligibilité ne détermine ni l'arrêt ni le rang. Aucun changement de barème.
 
-**Suite pour [#22](https://github.com/FlowHartigan/alice_wonder/issues/22) :** ne coder ni l'arrêt à égalité ni la priorité après abandon tant qu'une clarification applicable à l'édition FR ou un arbitrage produit explicite et documenté n'est pas obtenu. Aucun changement d'implémentation ni de barème dans #44.
+**Suite pour [#22](https://github.com/FlowHartigan/alice_wonder/issues/22) :** implémenter et synchroniser le cycle de combat, puis reprendre les quatre scénarios de pioche ci-dessus dans les tests automatisés. #47 ne modifie ni le moteur ni les règles de classement et de récompense.
