@@ -1,5 +1,6 @@
-import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS } from '@wonderland/shared';
-import type { LobbyAction, LobbyState, LobbyStateV1, LobbyStateV2, LobbyView, Reply } from '@wonderland/shared';
+import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, preparationBlockers } from '@wonderland/shared';
+import type { LobbyAction, LobbyState, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, Reply } from '@wonderland/shared';
+import { initializeGame } from './game.ts';
 
 export * from './battle.ts';
 export * from './game.ts';
@@ -8,7 +9,7 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 3, code, hostId: host.id, revision: 1, firstPlayerId: null,
+    version: 4, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null,
     players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
   };
@@ -32,26 +33,48 @@ export function migrateLobbyV1(old: LobbyStateV1): LobbyStateV2 {
   };
 }
 
-export function migrateLobbyV2(old: LobbyStateV2): LobbyState {
+export function migrateLobbyV2(old: LobbyStateV2): LobbyStateV3 {
   return { ...old, version: 3, firstPlayerId: null };
+}
+
+export function migrateLobbyV3(old: LobbyStateV3): LobbyState {
+  return normalizeFirstPlayer({ ...old, version: 4, game: null });
 }
 
 /** Restore before projecting, or call after a future roster removal and before committing it. */
 export function normalizeFirstPlayer(state: LobbyState): LobbyState {
-  if (state.firstPlayerId === null || state.players.some(({ id }) => id === state.firstPlayerId)) return state;
+  if (state.game || state.firstPlayerId === null || state.players.some(({ id }) => id === state.firstPlayerId)) return state;
   return advance({ ...state, firstPlayerId: null }, { revision: state.revision + 1, type: 'first-player-cleared' });
 }
 
 export function joinLobby(state: LobbyState, player: NewPlayer): Reply<LobbyState> {
+  if (state.game) return { ok: false, error: 'room-closed' };
   if (state.players.some(({ id }) => id === player.id)) return { ok: false, error: 'already-seated' };
   if (state.players.length >= MAX_PLAYERS) return { ok: false, error: 'room-full' };
   const next = advance(state, { revision: state.revision + 1, type: 'joined', actorId: player.id });
   return { ok: true, value: { ...next, players: [...state.players, { ...player, ready: false, faction: null }] } };
 }
 
-export function applyLobbyAction(state: LobbyState, actorId: string, action: LobbyAction): Reply<LobbyState> {
+type LobbyEdit = Exclude<LobbyAction, { type: 'launch-preparation' }>;
+
+export function launchPreparation(
+  state: LobbyState, actorId: string, expectedRevision: number, newGameId: () => string,
+): Reply<LobbyState> {
+  if (!state.players.some(({ id }) => id === actorId)) return { ok: false, error: 'unauthorized' };
+  if (actorId !== state.hostId) return { ok: false, error: 'host-required' };
+  if (state.game) return { ok: false, error: 'already-launched' };
+  // A successful concurrent admission must invalidate the host's old view of the roster.
+  if (expectedRevision !== state.revision) return { ok: false, error: 'conflict' };
+  const [blocker] = preparationBlockers(state);
+  if (blocker) return { ok: false, error: blocker };
+  const game = initializeGame(newGameId(), state.players.map(({ id }) => id));
+  return { ok: true, value: advance({ ...state, game }, { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
+}
+
+export function applyLobbyAction(state: LobbyState, actorId: string, action: LobbyEdit): Reply<LobbyState> {
   const player = state.players.find(({ id }) => id === actorId);
   if (!player) return { ok: false, error: 'unauthorized' };
+  if (state.game) return { ok: false, error: 'room-closed' };
   const revision = state.revision + 1;
   if (action.type === 'select-first-player') {
     // WW-SETUP-005 — the host records the table's choice; the server never picks a default.
@@ -81,11 +104,14 @@ export function applyLobbyAction(state: LobbyState, actorId: string, action: Lob
 }
 
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
+  const hostInLobby = !state.game && playerId === state.hostId;
   return {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
-    firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: playerId === state.hostId,
+    firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
+    launch: hostInLobby ? { blockers: preparationBlockers(state) } : null,
+    preparation: state.game ? { gameId: state.game.gameId } : null,
     players: state.players.map(({ id, name, ready, faction }) => ({ id, name, ready, faction })),
-    canSetReady: state.players.some(({ id, faction }) => id === playerId && faction !== null),
+    canSetReady: !state.game && state.players.some(({ id, faction }) => id === playerId && faction !== null),
     factions: FACTION_IDS.map((id) => {
       const owner = state.players.find(({ faction }) => faction === id);
       return { id, status: !owner ? 'available' : owner.id === playerId ? 'yours' : 'taken' };

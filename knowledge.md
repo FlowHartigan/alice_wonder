@@ -17,6 +17,7 @@
 | Docker n’était pas disponible dans le `PATH` pendant le prototype. | Pour la recette locale, utiliser SQLite via `node:sqlite` et la version Node du projet (`>=24`). Voir `docs/decisions.md` pour la cible PostgreSQL. | Le test de réouverture de la base a retrouvé la place, le statut et l’idempotence. |
 | TypeScript signalait `TS7053` après `socket.timeout(...).emitWithAck(...)` : la réponse devenait `any`. | Pour les appels à délai commun, régler `ackTimeout` dans les options de `io(...)` et appeler `socket.emitWithAck(...)` directement pour conserver le type de réponse. | `npm.cmd run build` est passé après la correction. |
 | Les tests Socket.IO tournaient, mais `tsc` rejetait `node:events.once(socket, ...)` avec `TS2769`. | Pour un client Socket.IO, envelopper `socket.once(...)` dans une promesse typée et traiter `connect_error`. Garder `node:events.once` pour les vrais `EventEmitter`, par exemple le serveur HTTP. | Les tests Vitest, la compilation et le parcours Playwright sont passés après la correction. |
+| Un test de non-diffusion recevait encore la dernière mise à jour de sa préparation de données. | Attendre explicitement la diffusion sur le socket observé avant de poser l'espion : l'acquittement reçu par un autre client n'est pas une barrière de réception. | Le test de rollback de #7 distingue la dernière désignation de J1 d'une éventuelle diffusion après le lancement annulé. |
 
 ## À garder en tête pour la suite
 

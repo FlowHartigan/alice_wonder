@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { createLobby, joinLobby, applyLobbyAction, migrateLobbyV1, migrateLobbyV2, normalizeFirstPlayer } from '@wonderland/game-engine';
-import { lobbySnapshot, lobbyState, lobbyStateV1, lobbyStateV2 } from '@wonderland/shared';
+import { createLobby, joinLobby, applyLobbyAction, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, normalizeFirstPlayer } from '@wonderland/game-engine';
+import { lobbySnapshot, lobbyState, lobbyStateV1, lobbyStateV2, lobbyStateV3 } from '@wonderland/shared';
 import type { LobbyAction, LobbyState, Reply, Session } from '@wonderland/shared';
 
 export type Seat = { code: string; playerId: string };
@@ -35,7 +35,7 @@ export function openStore(path: string) {
     }
   }
 
-  function restoreSnapshots(version: 1 | 2 | 3) {
+  function restoreSnapshots(version: 1 | 2 | 3 | 4) {
     const rows = db.prepare('SELECT code, snapshot FROM lobbies').all();
     for (const row of rows) {
       const raw: unknown = JSON.parse(String(row.snapshot));
@@ -46,10 +46,14 @@ export function openStore(path: string) {
       } else if (version === 2) {
         const old = lobbyStateV2.parse(raw);
         if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v2');
-        save(migrateLobbyV2(old));
+        writeSnapshot(lobbyStateV3.parse(migrateLobbyV2(old)));
+      } else if (version === 3) {
+        const old = lobbyStateV3.parse(raw);
+        if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v3');
+        save(migrateLobbyV3(old));
       } else {
         const snapshot = lobbySnapshot.parse(raw);
-        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v3');
+        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v4');
         const restored = normalizeFirstPlayer(snapshot);
         if (restored !== snapshot) save(restored);
       }
@@ -59,14 +63,17 @@ export function openStore(path: string) {
   try {
     transaction(() => {
       const version = db.prepare('PRAGMA user_version').get()?.user_version;
+      if (version !== 0 && version !== 1 && version !== 2 && version !== 3 && version !== 4) {
+        throw new Error('Version de base non prise en charge');
+      }
       if (version === 0) db.exec(migration1);
       if (version === 0 || version === 1) restoreSnapshots(1);
-      if (version === 0 || version === 1 || version === 2) {
-        restoreSnapshots(2);
-        // Preserve sessions and successful action fingerprints through both steps.
-        db.exec('PRAGMA user_version = 3');
-      } else if (version === 3) restoreSnapshots(3);
-      else throw new Error('Version de base non prise en charge');
+      if (version <= 2) restoreSnapshots(2);
+      if (version <= 3) {
+        restoreSnapshots(3);
+        // Preserve sessions and successful action fingerprints through all steps.
+        db.exec('PRAGMA user_version = 4');
+      } else restoreSnapshots(4);
     });
   } catch (error) {
     db.close();
@@ -134,12 +141,15 @@ export function openStore(path: string) {
         ).get(...args);
         // Preserve the v1 encoding for set-ready so accepted_actions still deduplicates it.
         const parameter = action.type === 'set-ready' ? action.ready
-          : action.type === 'select-faction' ? action.faction : action.firstPlayerId;
+          : action.type === 'select-faction' ? action.faction
+          : action.type === 'select-first-player' ? action.firstPlayerId : '';
         const intent = `${action.type}:${parameter}:${action.expectedRevision}`;
         if (previous) return previous.intent === intent
           ? { ok: true, value: { state, changed: false } }
           : { ok: false, error: 'conflict' };
-        const result = applyLobbyAction(state, seat.playerId, action);
+        const result = action.type === 'launch-preparation'
+          ? launchPreparation(state, seat.playerId, action.expectedRevision, randomUUID)
+          : applyLobbyAction(state, seat.playerId, action);
         if (!result.ok) return result;
         const changed = result.value !== state;
         if (changed) save(result.value);
