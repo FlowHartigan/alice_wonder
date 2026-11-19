@@ -237,7 +237,7 @@ function App() {
             {p.id === view.firstPlayerId && <span className="badge">Premier joueur (J1)</span>}
           </li>)}
         </ul>
-        <BoardPreview teaTable={preparation.teaTable} />
+        <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores} />
       </section> : <>
       <section className="panel" aria-labelledby="players">
         <div className="section-title"><h2 id="players">Joueurs</h2><span>{view.players.length} / {MAX_PLAYERS}</span></div>
