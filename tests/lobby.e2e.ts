@@ -6,12 +6,13 @@ import type { Page } from '@playwright/test';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { FACTION_IDS } from '@wonderland/shared';
-import type { ClientEvents, Reply, ServerEvents } from '@wonderland/shared';
+import type { ClientEvents, LobbyView, Reply, ServerEvents, Session } from '@wonderland/shared';
 import { makeServer } from '../apps/server/src/server.ts';
 
 const previewTitle = 'Aperçu du plateau — lecture seule';
 const teaSummary = 'Table du Thé : 11 chaises ouvertes. Chaises 4J et 5J bloquées. Aucune carte n’est installée.';
 const scoreCaption = 'Marqueurs Score de Région — attribution initiale';
+const firstTeaCaption = 'Aperçu — ordre prévu du premier Thé et Éclats de départ';
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
 const scoreSlots = [
   { id: 'donjon-rouge', name: 'Donjon rouge', pv: ['2', '6', '12'], x: 0.874, y: 0.671 },
@@ -20,6 +21,19 @@ const scoreSlots = [
   { id: 'mare-de-larmes', name: 'Mare de Larmes', pv: ['4', '8', '8'], x: 0.113, y: 0.516 },
   { id: 'comte-de-la-deraison', name: 'Comté de la Déraison', pv: ['6', '6', '8'], x: 0.886, y: 0.558 },
 ];
+
+async function checkFirstTea(player: Page, expected: [string, string][]) {
+  const table = player.getByRole('table', { name: firstTeaCaption });
+  await expect(table).toBeVisible();
+  await expect(table).toHaveAccessibleDescription('Les Éclats de départ sont prévus, pas encore crédités. Le premier Thé n’a pas commencé.');
+  await expect(table.getByRole('columnheader')).toHaveText(['Rang', 'Joueur', 'Éclats prévus']);
+  await expect(table.getByRole('rowheader')).toHaveText(expected.map((_, i) => `J${i + 1}`));
+  for (const [i, cells] of expected.entries()) {
+    const row = table.getByRole('row').filter({ has: player.getByRole('rowheader', { name: `J${i + 1}`, exact: true }) });
+    await expect(row.getByRole('cell')).toHaveText(cells);
+  }
+  await expect(table.locator('a, button, input, select, textarea, [tabindex]')).toHaveCount(0);
+}
 
 async function checkScores(player: Page, { twoPlayers, imageLoaded = true }: { twoPlayers: boolean; imageLoaded?: boolean }) {
   const preview = player.getByRole('region', { name: previewTitle });
@@ -175,6 +189,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       for (const player of [page, guest]) {
         await expect(player.getByRole('region', { name: previewTitle })).toHaveCount(0);
         await expect(player.getByRole('table', { name: scoreCaption })).toHaveCount(0);
+        await expect(player.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
       }
       await launch.focus();
       await page.keyboard.press('Enter');
@@ -194,6 +209,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
           await expect(player.getByRole('region', { name: 'Premier joueur' })).toHaveCount(0);
           await expect(player.getByRole('button', { name: 'Lancer la préparation' })).toHaveCount(0);
           await expect(player.getByText('Camille a lancé la préparation.')).toHaveCount(1);
+          await checkFirstTea(player, [['Dinah (siège 2)', '2'], ['Camille (siège 1)', '1']]);
           await checkBoard(player);
           await checkScores(player, { twoPlayers: true });
         }
@@ -225,6 +241,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await newcomer.getByRole('button', { name: 'Rejoindre le salon' }).click();
       await expect(newcomer.getByRole('alert')).toContainText('Le salon est fermé aux nouvelles admissions');
       await expect(newcomer.getByRole('region', { name: 'Préparation de la partie' })).toHaveCount(0);
+      await expect(newcomer.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
     } finally {
       await otherBrowser.close();
@@ -234,9 +251,11 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
   }
 });
 
-test('cinq sièges dont quatre simulés : placements lisibles au clavier, aucune chaise bloquée', async ({ page }) => {
+test('cinq sièges dont quatre simulés : ordre partagé, J5 à zéro, aucune chaise bloquée', async ({ page }) => {
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)), random: () => 0 });
   const clients: Socket<ServerEvents, ClientEvents>[] = [];
+  const guests: { session: Session; id: string }[] = [];
+  const preparedViews = new Map<string, LobbyView>();
   function success<T>(reply: Reply<T>): T {
     if (!reply.ok) throw new Error(reply.error);
     return reply.value;
@@ -258,7 +277,11 @@ test('cinq sièges dont quatre simulés : placements lisibles au clavier, aucune
     for (const [i, faction] of FACTION_IDS.slice(1).entries()) {
       const guest: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
       clients.push(guest);
-      const { view } = success(await guest.emitWithAck('lobby:join', { code, name: `Invité ${i + 1}` }));
+      guest.on('lobby:update', (view) => {
+        if (view.preparation) preparedViews.set(view.you, view);
+      });
+      const { view, session } = success(await guest.emitWithAck('lobby:join', { code, name: `Invité ${i + 1}` }));
+      guests.push({ session, id: view.you });
       const picked = success(await guest.emitWithAck('lobby:action', {
         type: 'select-faction', actionId: randomUUID(), expectedRevision: view.revision, faction,
       }));
@@ -267,8 +290,9 @@ test('cinq sièges dont quatre simulés : placements lisibles au clavier, aucune
       }));
     }
     await expect(page.getByText('Invité 4 est prêt.')).toBeVisible();
-    await page.getByRole('button', { name: 'Camille (siège 1)' }).click();
+    await page.getByRole('button', { name: 'Invité 2 (siège 3)' }).click();
     await expect(page.getByRole('table', { name: scoreCaption })).toHaveCount(0);
+    await expect(page.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
     await page.getByRole('button', { name: 'Lancer la préparation' }).click();
     await expect(page.getByRole('heading', { name: 'Préparation de la partie' })).toBeFocused();
     await page.keyboard.press('Tab');
@@ -277,6 +301,29 @@ test('cinq sièges dont quatre simulés : placements lisibles au clavier, aucune
     await expect(preview.getByText(/13 chaises ouvertes\. Aucune chaise bloquée/)).toBeVisible();
     await expect(preview.locator('.board-blocker')).toHaveCount(0);
     await checkScores(page, { twoPlayers: false });
+    const expected: [string, string][] = [
+      ['Invité 2 (siège 3)', '3'], ['Invité 3 (siège 4)', '2'], ['Invité 4 (siège 5)', '2'],
+      ['Camille (siège 1)', '1'], ['Invité 1 (siège 2)', '0'],
+    ];
+    await checkFirstTea(page, expected);
+    await expect.poll(() => preparedViews.size).toBe(4);
+    const [firstGuest, secondGuest, thirdGuest, fourthGuest] = guests;
+    const { hostId, preparation: shared } = preparedViews.get(firstGuest.id)!;
+    expect(shared?.firstTeaPreview).toEqual([
+      { playerId: secondGuest.id, turn: 1, plannedShards: 3 },
+      { playerId: thirdGuest.id, turn: 2, plannedShards: 2 },
+      { playerId: fourthGuest.id, turn: 3, plannedShards: 2 },
+      { playerId: hostId, turn: 4, plannedShards: 1 },
+      { playerId: firstGuest.id, turn: 5, plannedShards: 0 },
+    ]);
+    for (const { id } of guests) expect(preparedViews.get(id)?.preparation).toEqual(shared);
+
+    clients[1].disconnect();
+    await page.reload();
+    await checkFirstTea(page, expected);
+    const returned: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
+    clients.push(returned);
+    expect(success(await returned.emitWithAck('lobby:resume', secondGuest.session)).preparation).toEqual(shared);
   } finally {
     for (const client of clients) client.disconnect();
     await server.close();

@@ -8,7 +8,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { makeServer } from '../apps/server/src/server.ts';
-import { applyLobbyAction, createLobby, joinLobby, launchPreparation, normalizeFirstPlayer } from '@wonderland/game-engine';
+import { applyLobbyAction, createLobby, joinLobby, launchPreparation, normalizeFirstPlayer, viewFor } from '@wonderland/game-engine';
 import { FACTION_IDS, gameState, lobbyState } from '@wonderland/shared';
 import type { ClientEvents, FactionId, LobbyAction, LobbyState, LobbyView, Reply, ServerEvents } from '@wonderland/shared';
 
@@ -266,6 +266,10 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
       preparation: prepared.preparation, canSetReady: false, canSelectFirstPlayer: false, launch: null,
     });
     expect(prepared.preparation).toEqual({ gameId: expect.any(String), teaTable: { openChairs: 11, activeBlockers: ['4J', '5J'] },
+      firstTeaPreview: [
+        { playerId: joined.view.you, turn: 1, plannedShards: 2 },
+        { playerId: created.view.you, turn: 2, plannedShards: 1 },
+      ],
       regionScores: { placements: expectedPlacements, removalPending: true } });
     expect(random).toHaveBeenCalledTimes(5);
     expect(guestView).not.toHaveProperty('game');
@@ -274,9 +278,16 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
     expect(prepared.journal.filter(({ type }) => type === 'launch-preparation')).toHaveLength(1);
     const persisted = databaseContents(db);
     const snapshot = lobbyState.parse(JSON.parse(String(persisted.rooms[0].snapshot)));
-    expect(gameState.parse(snapshot.game)).toEqual({ gameId: prepared.preparation?.gameId, version: 1, revision: 0,
-      phase: { type: 'setup' }, playerIds: ready.players.map(({ id }) => id), history: [], decisions: [] });
-    expect(snapshot.regionScores).toEqual(expectedInventory);
+    expect(snapshot).toEqual({
+      ...JSON.parse(String(before.rooms[0].snapshot)),
+      revision: ready.revision + 1,
+      journal: [...ready.journal, { type: 'launch-preparation', actorId: created.view.you, revision: ready.revision + 1 }],
+      game: { gameId: prepared.preparation?.gameId, version: 1, revision: 0,
+        phase: { type: 'setup' }, playerIds: ready.players.map(({ id }) => id), history: [], decisions: [] },
+      regionScores: expectedInventory,
+    });
+    expect(viewFor(snapshot, randomUUID()).preparation).toBeNull();
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 5 });
     expect(persisted.sessions).toEqual(before.sessions);
     expect(persisted.receipts).toHaveLength(before.receipts.length + 1);
 
@@ -307,18 +318,23 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
     expect(success(await hostRestored.emitWithAck('lobby:resume', created.session))).toEqual(prepared);
     expect(success(await guestRestored.emitWithAck('lobby:resume', joined.session))).toEqual(guestView);
     expect(await newClient.emitWithAck('lobby:join', newSeat)).toEqual({ ok: false, error: 'room-closed' });
+    const afterRestoreUpdate = vi.fn();
+    guestRestored.on('lobby:update', afterRestoreUpdate);
     expect(success(await hostRestored.emitWithAck('lobby:action', requests[winner]))).toEqual(prepared);
+    // The resume ack on this socket follows any broadcast that the replay could have produced.
+    expect(success(await guestRestored.emitWithAck('lobby:resume', joined.session))).toEqual(guestView);
+    expect(afterRestoreUpdate).not.toHaveBeenCalled();
     expect(databaseContents(db)).toEqual(persisted);
     expect(random).toHaveBeenCalledTimes(5);
   } finally { db.close(); }
 });
 
 it.each([
-  { count: 2, openChairs: 11, activeBlockers: ['4J', '5J'] },
-  { count: 3, openChairs: 11, activeBlockers: ['4J', '5J'] },
-  { count: 4, openChairs: 12, activeBlockers: ['5J'] },
-  { count: 5, openChairs: 13, activeBlockers: [] },
-])('projette les mêmes chaises et marqueurs à $count sièges au lancement, à la reconnexion et après restauration', async ({ count, ...teaTable }) => {
+  { count: 2, openChairs: 11, activeBlockers: ['4J', '5J'], shards: [2, 1] },
+  { count: 3, openChairs: 11, activeBlockers: ['4J', '5J'], shards: [3, 2, 1] },
+  { count: 4, openChairs: 12, activeBlockers: ['5J'], shards: [3, 2, 2, 1] },
+  { count: 5, openChairs: 13, activeBlockers: [], shards: [3, 2, 2, 1, 0] },
+])('projette les mêmes chaises, marqueurs et aperçu du premier Thé à $count sièges au lancement et à la reprise', async ({ count, shards, ...teaTable }) => {
   const database = tempDatabase();
   const random = vi.fn(() => 0);
   const url = await start(database, random);
@@ -336,10 +352,11 @@ it.each([
     view = joined.view;
   }
   for (const [i, socket] of seats.entries()) {
-    view = success(await socket.emitWithAck('lobby:action', selectFaction(FACTION_IDS[i], view.revision)));
+    // Give Alice to the second admitted seat, not to the host.
+    view = success(await socket.emitWithAck('lobby:action', selectFaction(FACTION_IDS[(i + count - 1) % count], view.revision)));
     view = success(await socket.emitWithAck('lobby:action', setReady(true, view.revision)));
   }
-  const firstPlayerId = created.view.you;
+  const firstPlayerId = seatIds[1];
   const choice = selectFirstPlayer(firstPlayerId, view.revision);
   const { view: configured, received: choices } = await actionWithUpdates(host, seats, choice);
   const choiceRevision = choice.expectedRevision + 1;
@@ -350,7 +367,9 @@ it.each([
   const request = launch(configured.revision);
   const { view: prepared, received: allViews } = await actionWithUpdates(host, seats, request);
   expect(allViews[0]).toEqual(prepared);
+  const clockwise = [...seatIds.slice(1), seatIds[0]];
   expect(prepared.preparation).toEqual({ gameId: expect.any(String), teaTable,
+    firstTeaPreview: shards.map((plannedShards, i) => ({ playerId: clockwise[i], turn: i + 1, plannedShards })),
     regionScores: { placements: expectedPlacements, removalPending: count === 2 } });
   const db = new DatabaseSync(database);
   try {

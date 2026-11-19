@@ -1,6 +1,6 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
 import type { LobbyAction, LobbySnapshotV4, LobbyState, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, Reply } from '@wonderland/shared';
-import { initializeGame, teaTableForSetup } from './game.ts';
+import { firstTeaForSetup, initializeGame, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
 import { assignRegionScoreMarkers } from './region-score-markers.ts';
 
@@ -125,13 +125,15 @@ export function applyLobbyAction(state: LobbyState, actorId: string, action: Lob
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
   const hostInLobby = !state.game && playerId === state.hostId;
   const { game, regionScores } = state;
+  const firstTeaPreview = game?.playerIds.includes(playerId) ? firstTeaForSetup(game, state.firstPlayerId) : null;
   return {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
     firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
     launch: hostInLobby ? { blockers: preparationBlockers(state) } : null,
-    preparation: game?.phase.type === 'setup' && regionScores ? {
+    preparation: game && regionScores && firstTeaPreview ? {
       gameId: game.gameId,
       teaTable: teaTableForSetup(game),
+      firstTeaPreview,
       regionScores: {
         placements: REGION_CATALOG.clockwise.map((regionId) => {
           const { markerId } = regionScores.placements.find((placement) => placement.regionId === regionId)!;

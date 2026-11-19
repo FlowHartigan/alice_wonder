@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { applyGameAction, initializeGame, privatePlayerView, publicGameView, shuffle, teaTableForSetup } from '@wonderland/game-engine';
+import { applyGameAction, firstTeaForSetup, initializeGame, privatePlayerView, publicGameView, shuffle, teaTableForSetup } from '@wonderland/game-engine';
 import { gameState } from '@wonderland/shared';
 import type { GameAction, GamePhase, GameState } from '@wonderland/shared';
 
@@ -48,6 +48,35 @@ it.each([
   const before = structuredClone(state);
   expect(teaTableForSetup(state)).toEqual(expected);
   expect(state).toEqual(before);
+});
+
+it.each([
+  { seats: [2, 3], clockwise: [3, 2], shards: [2, 1] },
+  { seats: [2, 3, 4], clockwise: [3, 4, 2], shards: [3, 2, 1] },
+  { seats: [2, 3, 4, 5], clockwise: [3, 4, 5, 2], shards: [3, 2, 2, 1] },
+  { seats: [2, 3, 4, 5, 6], clockwise: [3, 4, 5, 6, 2], shards: [3, 2, 2, 1, 0] },
+])('WW-SETUP-005 : tourne depuis J1 non hôte et prévoit $shards Éclats', ({ seats, clockwise, shards }) => {
+  const state = initializeGame(gameId, seats.map(id));
+  const before = structuredClone(state);
+  Object.freeze(state.playerIds);
+  Object.freeze(state);
+  const expected = clockwise.map((seat, index) => ({ playerId: id(seat), turn: index + 1, plannedShards: shards[index] }));
+  expect(firstTeaForSetup(state, id(3))).toEqual(expected);
+  expect(firstTeaForSetup(state, id(3))).toEqual(expected);
+  expect(firstTeaForSetup(state, id(2))?.map(({ playerId }) => playerId)).toEqual(seats.map(id));
+  expect(state).toEqual(before);
+});
+
+it('WW-SETUP-005 : pas d’aperçu sans J1 admis, hors setup ou avec un effectif non prévu', () => {
+  const state = initializeGame(gameId, [firstPlayer, secondPlayer]);
+  for (const j1 of [null, id(99)]) expect(firstTeaForSetup(state, j1)).toBeNull();
+  for (const phase of [tea, { type: 'war', round: 1 } as const]) {
+    expect(firstTeaForSetup({ ...state, phase }, firstPlayer)).toBeNull();
+  }
+  for (const count of [1, 6]) {
+    const playerIds = Array.from({ length: count }, (_, i) => id(i + 2));
+    expect(firstTeaForSetup({ ...state, playerIds }, firstPlayer)).toBeNull();
+  }
 });
 
 it('rejoue les mêmes intentions et événements à partir du même hasard injecté', () => {
