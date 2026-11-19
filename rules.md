@@ -183,7 +183,9 @@ Tableau relevé **visuellement** en bas à droite de la p. 5 du PDF FR : chaque 
 
 **Récompenses après la fin du combat — rappel uniquement.** Selon la p. 21 FR et [`WW-COUNT-001`](#ww-count-001--exceptions-à-deux-joueurs), une Force **finale** de 4 au round II ne donne pas de récompense de conquête ; une Force finale de 5 remplit le seuil d'éligibilité. Ce contrôle d'éligibilité ne détermine ni le droit de repiocher, ni le moment de l'arrêt, ni le rang (`WW-WAR-007`). Le barème reste inchangé.
 
-Voir la [recette documentaire](docs/rules-coverage.md#recette-documentaire-de-larrêt-des-pioches-à-2j). L'implémentation, la synchronisation et les tests automatisés du cycle de combat restent à faire dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22).
+**Implémentation et tests — [#49](https://github.com/FlowHartigan/alice_wonder/issues/49), critère spécial uniquement.** La fonction pure `triggersTwoPlayerDrawStop`, exportée par `@wonderland/game-engine`, lit l'effectif total de la partie, le round, le signal explicite de résolution complète de la première pioche et les statuts et Forces des combattants humains (sans la Résistance). Elle signale ce motif d'arrêt sans modifier l'instantané. `false` signifie seulement que ce motif ne s'applique pas ; ce n'est pas une autorisation de repiocher.
+
+Voir la [recette documentaire](docs/rules-coverage.md#recette-documentaire-de-larrêt-des-pioches-à-2j) et la [couverture des tests unitaires](docs/rules-coverage.md#tests-unitaires-du-critère-spécial-à-2j). Le cycle de combat reste à intégrer, synchroniser et tester dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22), notamment la production du signal de résolution complète. `WW-WAR-003`, les autres motifs d'arrêt, le classement et les récompenses ne sont pas implémentés ni validés par cet incrément.
 
 ## 5. Sac et jetons — À vérifier
 
