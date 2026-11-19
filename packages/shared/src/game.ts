@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-const id = z.uuid();
+// One spelling per UUID before checking uniqueness, membership or replay keys.
+const id = z.uuid().refine((value) => value === value.toLowerCase(), { message: 'UUID attendu en minuscules' });
 const round = z.literal([1, 2, 3]);
 export const gamePhase = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('setup') }),

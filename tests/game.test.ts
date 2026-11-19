@@ -1,9 +1,10 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { applyGameAction, privatePlayerView, publicGameView, shuffle } from '@wonderland/game-engine';
 import { gameState } from '@wonderland/shared';
 import type { GameAction, GamePhase, GameState } from '@wonderland/shared';
 
-const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const id = (n: number) => `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, '0')}`;
+const variant = (uuid: string) => uuid.toUpperCase();
 const [gameId, firstPlayer, secondPlayer] = [id(1), id(2), id(3)];
 const first = { gameId, playerId: firstPlayer };
 const second = { gameId, playerId: secondPlayer };
@@ -86,18 +87,65 @@ it('rejoue le reçu original après de nouvelles actions et un aller-retour du s
   expect(applyGameAction(restored, first, submit(31, 11, 22))).toEqual({ ok: false, error: 'conflict' });
 });
 
+it('rejoue un succès après un changement de phase, sans permettre un nouveau dépôt hors phase', () => {
+  const one = accepted(applyGameAction(fixture(), first, a));
+  // Restored fixture only: this engine does not implement a phase transition.
+  const restored = gameState.parse(JSON.parse(JSON.stringify({
+    ...one.state, revision: one.state.revision + 1, phase: { type: 'war', round: 1 },
+  })));
+  expect(applyGameAction(restored, first, nextA)).toEqual({ ok: false, error: 'wrong-phase' });
+  const replay = accepted(applyGameAction(restored, first, a));
+  expect(replay.changed).toBe(false);
+  expect(replay.receipt).toEqual(one.receipt);
+  expect(replay.state).toBe(restored);
+});
+
 it('refuse une collision de révisions et une seconde soumission de la même décision', () => {
   const start = fixture();
   const proposedConcurrently = submit(32, 13, 26);
   expect(applyGameAction(start, first, proposedConcurrently).ok).toBe(true);
   const one = accepted(applyGameAction(start, first, a));
-  expect(applyGameAction(one.state, first, proposedConcurrently)).toEqual({ ok: false, error: 'conflict' });
+  const conflict = { ok: false, error: 'conflict' };
+  expect(applyGameAction(one.state, first, proposedConcurrently)).toEqual(conflict);
+  // A different otherwise valid command cannot reuse a key already bound to a success.
+  expect(applyGameAction(one.state, first, { ...nextA, actionId: a.actionId })).toEqual(conflict);
   expect(applyGameAction(one.state, first, { ...a, actionId: id(33), expectedRevision: 1 })).toEqual({
     ok: false, error: 'decision-unavailable',
   });
-  expect(accepted(applyGameAction(one.state, first, nextA)).state.history).toHaveLength(2);
+  const corrected = accepted(applyGameAction(one.state, first, nextA));
+  expect(corrected.state.history).toHaveLength(2);
+  expect(applyGameAction(corrected.state, first, proposedConcurrently)).toEqual(conflict);
   expect(one.state.history).toHaveLength(1);
   expect(start.history).toEqual([]);
+});
+
+it('refuse une révision future sans mutation ni tirage et exige un renvoi explicite', () => {
+  const random = vi.fn(() => 0.99);
+  const start = fixture(random);
+  const before = structuredClone(start);
+  random.mockClear();
+  const implicitRandom = vi.spyOn(Math, 'random');
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(applyGameAction(start, first, nextA)).toEqual({ ok: false, error: 'conflict' });
+    }
+    expect(implicitRandom).not.toHaveBeenCalled();
+  } finally {
+    implicitRandom.mockRestore();
+  }
+  expect(random).not.toHaveBeenCalled();
+  expect(start).toEqual(before);
+
+  const one = accepted(applyGameAction(start, first, a));
+  expect(one.state.revision).toBe(before.revision + 1);
+  expect(one.state.history.map(({ action }) => action)).toEqual([a]);
+  expect(privatePlayerView(one.state, first)).toMatchObject({
+    revision: 1, decisions: [{ id: id(13), optionIds: [id(26)] }], events: [eventA],
+  });
+  const resent = accepted(applyGameAction(one.state, first, nextA));
+  expect(resent.changed).toBe(true);
+  expect(resent.receipt.revision).toBe(2);
+  expect(resent.state.history.map(({ action }) => action)).toEqual([a, nextA]);
 });
 
 it.each<GamePhase>([{ type: 'setup' }, { type: 'war', round: 1 }, { type: 'tea', round: 2 }])(
@@ -128,6 +176,29 @@ it('contrôle la session, l’intention et ses paramètres sans donner d’oracl
   expect(applyGameAction(start, second, a)).toEqual(unavailable);
   expect(applyGameAction(after, second, a)).toEqual(unavailable);
   expect(applyGameAction(start, second, submit(31, 99, 21))).toEqual(unavailable);
+});
+
+it('refuse les UUID non canoniques du siège, de la commande et du rejeu', () => {
+  const start = fixture();
+  for (const seat of [{ ...first, gameId: variant(gameId) }, { ...first, playerId: variant(firstPlayer) }]) {
+    expect(applyGameAction(start, seat, a)).toEqual({ ok: false, error: 'unauthorized' });
+    expect(privatePlayerView(start, seat)).toBeUndefined();
+  }
+  const one = accepted(applyGameAction(start, first, a));
+  const before = structuredClone(one.state);
+  for (const command of [
+    { ...a, actionId: variant(a.actionId) },
+    { ...a, params: { ...a.params, decisionId: variant(a.params.decisionId) } },
+    { ...a, params: { ...a.params, optionId: variant(a.params.optionId) } },
+  ]) {
+    expect(applyGameAction(start, first, command)).toEqual({ ok: false, error: 'invalid' });
+    expect(applyGameAction(one.state, first, command)).toEqual({ ok: false, error: 'invalid' });
+  }
+  // The case alias cannot submit a second decision at the now-current revision either.
+  expect(applyGameAction(one.state, first, { ...nextA, actionId: variant(a.actionId) })).toEqual({
+    ok: false, error: 'invalid',
+  });
+  expect(one.state).toEqual(before);
 });
 
 it('sépare les décisions et événements des deux vues et ne publie aucun champ interne', () => {
@@ -171,4 +242,44 @@ it('rejette les formats inconnus, les rounds invalides et les identités ou déc
   ]) {
     expect(gameState.safeParse(invalid).success).toBe(false);
   }
+});
+
+it('rejette les UUID non canoniques et les doublons de casse dans le snapshot', () => {
+  const state = fixture();
+  const [decision] = state.decisions;
+  for (const invalid of [
+    { ...state, gameId: variant(gameId) },
+    { ...state, playerIds: [firstPlayer, variant(firstPlayer)] },
+    { ...state, decisions: [{ ...decision, actorId: variant(firstPlayer) }] },
+    { ...state, decisions: [decision, { ...decision, id: variant(decision.id) }] },
+    { ...state, decisions: [{ ...decision, optionIds: [id(21), variant(id(21))] }] },
+  ]) {
+    expect(gameState.safeParse(invalid).success).toBe(false);
+  }
+});
+
+const historyCorruptions: Record<string, (snapshot: GameState) => void> = {
+  'acteur inconnu': (state) => { state.history[0].actorId = id(99); },
+  'acteur non canonique': (state) => { state.history[0].actorId = variant(firstPlayer); },
+  'clé de succès réutilisée pour une autre décision': (state) => { state.history[1].action.actionId = a.actionId; },
+  'variante de casse de la clé de succès': (state) => { state.history[1].action.actionId = variant(a.actionId); },
+  'décision différente dans le reçu': (state) => { state.history[0].event.decisionId = id(99); },
+  'option différente dans le reçu': (state) => { state.history[0].event.optionId = id(22); },
+  'décision non canonique dans la commande et son événement': (state) => {
+    state.history[0].action.params.decisionId = state.history[0].event.decisionId = variant(id(11));
+  },
+  'option non canonique dans la commande et son événement': (state) => {
+    state.history[0].action.params.optionId = state.history[0].event.optionId = variant(id(21));
+  },
+  'révision privée non contiguë': (state) => { state.history[1].action.expectedRevision = 2; },
+  'décision consommée encore en attente': (state) => { state.decisions.push(fixture().decisions[0]); },
+  'révision globale inférieure au nombre de succès': (state) => { state.revision = 1; },
+};
+
+it.each(Object.entries(historyCorruptions))('refuse de restaurer un historique malformé : %s', (_label, corrupt) => {
+  const one = accepted(applyGameAction(fixture(), first, a));
+  const two = accepted(applyGameAction(one.state, first, nextA));
+  const snapshot = gameState.parse(JSON.parse(JSON.stringify(two.state)));
+  corrupt(snapshot);
+  expect(gameState.safeParse(JSON.parse(JSON.stringify(snapshot))).success).toBe(false);
 });

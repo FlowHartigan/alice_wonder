@@ -9,6 +9,7 @@ type GameActionResult =
   | { ok: true; state: GameState; changed: boolean; receipt: Receipt }
   | { ok: false; error: 'unauthorized' | 'invalid' | 'conflict' | 'decision-unavailable' | 'wrong-phase' };
 
+// In a validated snapshot, exact membership also rejects non-canonical session IDs.
 function actorIn(state: GameState, seat: GameSeat | undefined): string | undefined {
   return seat?.gameId === state.gameId && state.playerIds.includes(seat.playerId) ? seat.playerId : undefined;
 }
@@ -21,6 +22,7 @@ function eventView({ decisionId, optionId }: PrivateGameEvent): PrivateGameEvent
   return { type: 'decision-submitted', decisionId, optionId };
 }
 
+/** Expects authoritative state validated with gameState at creation or restoration. */
 export function applyGameAction(state: GameState, seat: GameSeat | undefined, raw: unknown): GameActionResult {
   const actorId = actorIn(state, seat);
   if (!actorId) return { ok: false, error: 'unauthorized' };
@@ -28,6 +30,7 @@ export function applyGameAction(state: GameState, seat: GameSeat | undefined, ra
   if (!parsed.success) return { ok: false, error: 'invalid' };
   const action = parsed.data;
 
+  // Only successes bind a key; replay them before checking current revision and phase.
   const history = state.history.filter((entry) => entry.actorId === actorId);
   const replayIndex = history.findIndex((entry) => entry.action.actionId === action.actionId);
   if (replayIndex !== -1) {
