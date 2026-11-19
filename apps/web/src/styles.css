@@ -72,6 +72,29 @@ small { color: #decce5; margin-inline-start: .25rem; }
 /* Centers of the printed 4/5 markers on the upper edge of the official FR tea table. */
 .board-blocker[data-chair="4J"] { left: 55.4%; }
 .board-blocker[data-chair="5J"] { left: 63.1%; }
+.board-score-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border: 1px solid #201521;
+  border-radius: .25rem;
+  padding-inline: .35em;
+  background: #fff0bf;
+  color: #201521;
+  font-size: clamp(.55rem, 1.6cqi, .95rem);
+  font-weight: 800;
+  white-space: nowrap;
+}
+/* Centers of the three printed score slots next to each region name on the FR WebP. */
+.board-score-marker[data-region="donjon-rouge"] { left: 87.4%; top: 67.1%; }
+.board-score-marker[data-region="foret-de-tulgey"] { left: 56.9%; top: 89.2%; }
+.board-score-marker[data-region="jardin-des-fleurs-vivantes"] { left: 11.2%; top: 63.2%; }
+.board-score-marker[data-region="mare-de-larmes"] { left: 11.3%; top: 51.6%; }
+.board-score-marker[data-region="comte-de-la-deraison"] { left: 88.6%; top: 55.8%; }
 .board-credit { color: #decce5; font-size: .85rem; }
+.board-scores { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.board-scores caption { text-align: start; font-weight: 700; padding-bottom: .35rem; }
+.board-scores th, .board-scores td { text-align: center; padding: .35rem .25rem; border-bottom: 1px solid #614971; }
+.board-scores th:first-child { text-align: start; }
 footer { text-align: center; font-size: .85rem; margin: 1.5rem 0; color: #e0cde5; }
 @media (max-width: 42rem) { .lobby { grid-template-columns: 1fr; } }

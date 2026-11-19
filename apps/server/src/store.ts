@@ -1,7 +1,8 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { createLobby, joinLobby, applyLobbyAction, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, normalizeFirstPlayer } from '@wonderland/game-engine';
-import { lobbySnapshot, lobbyState, lobbyStateV1, lobbyStateV2, lobbyStateV3 } from '@wonderland/shared';
+import { createLobby, joinLobby, applyLobbyAction, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, normalizeFirstPlayer } from '@wonderland/game-engine';
+import type { RandomSource } from '@wonderland/game-engine';
+import { lobbySnapshot, lobbySnapshotV4, lobbyState, lobbyStateV1, lobbyStateV2, lobbyStateV3 } from '@wonderland/shared';
 import type { LobbyAction, LobbyState, Reply, Session } from '@wonderland/shared';
 
 export type Seat = { code: string; playerId: string };
@@ -20,7 +21,10 @@ const migration1 = `
   PRAGMA user_version = 1;
 `;
 
-export function openStore(path: string) {
+// Uniform over 32 bits; shuffle consumes fractions in [0, 1).
+const randomFraction: RandomSource = () => randomInt(2 ** 32) / 2 ** 32;
+
+export function openStore(path: string, random: RandomSource = randomFraction) {
   const db = new DatabaseSync(path);
 
   function transaction<T>(operation: () => T): T {
@@ -35,7 +39,7 @@ export function openStore(path: string) {
     }
   }
 
-  function restoreSnapshots(version: 1 | 2 | 3 | 4) {
+  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5) {
     const rows = db.prepare('SELECT code, snapshot FROM lobbies').all();
     for (const row of rows) {
       const raw: unknown = JSON.parse(String(row.snapshot));
@@ -51,9 +55,13 @@ export function openStore(path: string) {
         const old = lobbyStateV3.parse(raw);
         if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v3');
         save(migrateLobbyV3(old));
+      } else if (version === 4) {
+        const old = lobbySnapshotV4.parse(raw);
+        if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v4');
+        save(migrateLobbyV4(old, random));
       } else {
         const snapshot = lobbySnapshot.parse(raw);
-        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v4');
+        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v5');
         const restored = normalizeFirstPlayer(snapshot);
         if (restored !== snapshot) save(restored);
       }
@@ -63,17 +71,19 @@ export function openStore(path: string) {
   try {
     transaction(() => {
       const version = db.prepare('PRAGMA user_version').get()?.user_version;
-      if (version !== 0 && version !== 1 && version !== 2 && version !== 3 && version !== 4) {
+      if (version !== 0 && version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5) {
         throw new Error('Version de base non prise en charge');
       }
       if (version === 0) db.exec(migration1);
       if (version === 0 || version === 1) restoreSnapshots(1);
       if (version <= 2) restoreSnapshots(2);
-      if (version <= 3) {
-        restoreSnapshots(3);
+      if (version <= 3) restoreSnapshots(3);
+      else if (version === 4) restoreSnapshots(4);
+      else restoreSnapshots(5);
+      if (version < 5) {
         // Preserve sessions and successful action fingerprints through all steps.
-        db.exec('PRAGMA user_version = 4');
-      } else restoreSnapshots(4);
+        db.exec('PRAGMA user_version = 5');
+      }
     });
   } catch (error) {
     db.close();
@@ -148,7 +158,7 @@ export function openStore(path: string) {
           ? { ok: true, value: { state, changed: false } }
           : { ok: false, error: 'conflict' };
         const result = action.type === 'launch-preparation'
-          ? launchPreparation(state, seat.playerId, action.expectedRevision, randomUUID)
+          ? launchPreparation(state, seat.playerId, action.expectedRevision, randomUUID, random)
           : applyLobbyAction(state, seat.playerId, action);
         if (!result.ok) return result;
         const changed = result.value !== state;

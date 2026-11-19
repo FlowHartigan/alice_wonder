@@ -3,6 +3,7 @@ import express from 'express';
 import { Server } from 'socket.io';
 import type { ZodType } from 'zod';
 import { viewFor } from '@wonderland/game-engine';
+import type { RandomSource } from '@wonderland/game-engine';
 import { createInput, joinInput, credentials, lobbyAction } from '@wonderland/shared';
 import type { ClientEvents, LobbyState, Reply, ServerEvents } from '@wonderland/shared';
 import { openStore } from './store.ts';
@@ -24,8 +25,8 @@ function handler<Input, Output>(schema: ZodType<Input>, operation: (input: Input
   };
 }
 
-export function makeServer(options: { database: string; webRoot?: string; publicOrigin?: string }) {
-  const store = openStore(options.database);
+export function makeServer(options: { database: string; webRoot?: string; publicOrigin?: string; random?: RandomSource }) {
+  const store = openStore(options.database, options.random);
   const app = express();
   app.disable('x-powered-by');
   app.get('/health', (_req, res) => res.json({ ok: true }));

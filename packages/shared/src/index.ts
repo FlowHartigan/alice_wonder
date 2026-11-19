@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { gameState } from './game.ts';
+import { initialRegionScores } from './region-score-markers.ts';
+import type { RegionScoresSetupView } from './region-score-markers.ts';
 
 export * from './game.ts';
 export * from './region-score-markers.ts';
@@ -112,10 +114,11 @@ const lobbyEvent = z.discriminatedUnion('type', [
   ...eventsV3,
   z.strictObject({ revision: z.int().positive(), type: z.literal('launch-preparation'), actorId: id }),
 ]);
-export const lobbySnapshot = lobbyWithFactions.extend({
-  version: z.literal(4), firstPlayerId: id.nullable(), game: gameState.nullable(),
+const lobbyWithGame = lobbyWithFactions.omit({ version: true }).extend({
+  firstPlayerId: id.nullable(), game: gameState.nullable(),
   journal: z.array(lobbyEvent).max(JOURNAL_LIMIT),
-}).refine(factionsAreUnique, uniqueFactionMessage).refine((state) => {
+});
+function validPreparation(state: z.infer<typeof lobbyWithGame>) {
   const { players, hostId, game, journal, revision } = state;
   const seats = new Set(players.map(({ id }) => id));
   if (seats.size !== players.length || !seats.has(hostId)) return false;
@@ -127,7 +130,18 @@ export const lobbySnapshot = lobbyWithFactions.extend({
     && game.playerIds.length === players.length && players.every(({ id }, i) => game.playerIds[i] === id)
     && launches.length === 1 && last?.type === 'launch-preparation'
     && last.actorId === hostId && last.revision === revision;
-}, 'Sièges ou état de préparation incohérents');
+}
+const preparationMessage = 'Sièges ou état de préparation incohérents';
+export const lobbySnapshotV4 = lobbyWithGame.extend({
+  version: z.literal(4), regionScores: initialRegionScores.optional(),
+}).refine(factionsAreUnique, uniqueFactionMessage)
+  .refine((state) => validPreparation(state) && (state.game !== null || state.regionScores === undefined), preparationMessage);
+export type LobbySnapshotV4 = z.infer<typeof lobbySnapshotV4>;
+
+export const lobbySnapshot = lobbyWithGame.extend({
+  version: z.literal(5), regionScores: initialRegionScores.nullable(),
+}).refine(factionsAreUnique, uniqueFactionMessage)
+  .refine((state) => validPreparation(state) && (state.game === null) === (state.regionScores === null), preparationMessage);
 export const lobbyState = lobbySnapshot.refine(({ firstPlayerId, players }) => (
   firstPlayerId === null || players.some(({ id }) => id === firstPlayerId)
 ), { message: 'Le premier joueur doit avoir un siège dans le salon', path: ['firstPlayerId'] });
@@ -140,7 +154,7 @@ export type LobbyView = Pick<LobbyState, 'code' | 'hostId' | 'revision' | 'first
   canSetReady: boolean;
   canSelectFirstPlayer: boolean;
   launch: { blockers: LaunchBlocker[] } | null;
-  preparation: { gameId: string; teaTable: TeaTableSetupView } | null;
+  preparation: { gameId: string; teaTable: TeaTableSetupView; regionScores: RegionScoresSetupView } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };
 export type Reply<T> = { ok: true; value: T } | { ok: false; error: ErrorCode };

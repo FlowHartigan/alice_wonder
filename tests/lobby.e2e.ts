@@ -1,11 +1,51 @@
 import { once } from 'node:events';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { expect, firefox, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
+import { FACTION_IDS } from '@wonderland/shared';
+import type { ClientEvents, Reply, ServerEvents } from '@wonderland/shared';
 import { makeServer } from '../apps/server/src/server.ts';
 
 const previewTitle = 'Aperçu du plateau — lecture seule';
 const teaSummary = 'Table du Thé : 11 chaises ouvertes. Chaises 4J et 5J bloquées. Aucune carte n’est installée.';
+const scoreCaption = 'Marqueurs Score de Région — attribution initiale';
+const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
+const scoreSlots = [
+  { id: 'donjon-rouge', name: 'Donjon rouge', pv: ['2', '6', '12'], x: 0.874, y: 0.671 },
+  { id: 'foret-de-tulgey', name: 'Forêt de Tulgey', pv: ['2', '8', '10'], x: 0.569, y: 0.892 },
+  { id: 'jardin-des-fleurs-vivantes', name: 'Jardin des Fleurs vivantes', pv: ['4', '6', '10'], x: 0.112, y: 0.632 },
+  { id: 'mare-de-larmes', name: 'Mare de Larmes', pv: ['4', '8', '8'], x: 0.113, y: 0.516 },
+  { id: 'comte-de-la-deraison', name: 'Comté de la Déraison', pv: ['6', '6', '8'], x: 0.886, y: 0.558 },
+];
+
+async function checkScores(player: Page, { twoPlayers, imageLoaded = true }: { twoPlayers: boolean; imageLoaded?: boolean }) {
+  const preview = player.getByRole('region', { name: previewTitle });
+  const table = preview.getByRole('table', { name: scoreCaption });
+  await expect(table).toBeVisible();
+  await expect(table.getByRole('columnheader')).toHaveText(['Région', 'PV round I', 'PV round II', 'PV round III']);
+  await expect(table.getByRole('row')).toHaveCount(6);
+  await expect(preview.getByText(deferredRemoval)).toHaveCount(twoPlayers ? 1 : 0);
+  const markers = preview.locator('.board-score-marker');
+  await expect(markers).toHaveCount(imageLoaded ? 5 : 0);
+  const image = await preview.getByRole('img').boundingBox();
+  if (!image) throw new Error('Aperçu introuvable');
+  for (const { id, name, pv, x, y } of scoreSlots) {
+    const row = table.getByRole('row').filter({ has: player.getByRole('rowheader', { name, exact: true }) });
+    await expect(row.getByRole('cell')).toHaveText(pv);
+    if (!imageLoaded) continue;
+    const marker = markers.and(preview.locator(`[data-region="${id}"]`));
+    await expect(marker).toHaveText(pv.join('/'));
+    await expect(marker).toHaveAttribute('aria-hidden', 'true');
+    await expect(marker).toHaveCSS('pointer-events', 'none');
+    const box = await marker.boundingBox();
+    if (!box) throw new Error(`Marqueur absent : ${id}`);
+    expect((box.x + box.width / 2 - image.x) / image.width).toBeCloseTo(x, 3);
+    expect((box.y + box.height / 2 - image.y) / image.height).toBeCloseTo(y, 3);
+  }
+}
 
 async function checkBoard(player: Page) {
   const preview = player.getByRole('region', { name: previewTitle });
@@ -31,11 +71,11 @@ async function checkBoard(player: Page) {
     expect((box.x + box.width / 2 - imageBox.x) / imageBox.width).toBeCloseTo(x, 3);
     expect((box.y + box.height / 2 - imageBox.y) / imageBox.height).toBeCloseTo(0.241, 3);
   }
-  await expect(preview.locator('a, button, input, select, textarea, canvas, [tabindex], [role=button]')).toHaveCount(0);
+  await expect(preview.locator('a, button, input, select, textarea, canvas, [role=button]')).toHaveCount(0);
 }
 
 test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la retrouvent', async ({ page }) => {
-  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)) });
+  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)), random: () => 0 });
   const listening = once(server.http, 'listening');
   server.http.listen(0, '127.0.0.1');
   try {
@@ -134,6 +174,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(launch).toBeEnabled();
       for (const player of [page, guest]) {
         await expect(player.getByRole('region', { name: previewTitle })).toHaveCount(0);
+        await expect(player.getByRole('table', { name: scoreCaption })).toHaveCount(0);
       }
       await launch.focus();
       await page.keyboard.press('Enter');
@@ -144,7 +185,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         for (const player of [page, guest]) {
           const panel = player.getByRole('region', { name: 'Préparation de la partie' });
           await expect(panel.getByText('Admissions fermées.')).toBeVisible();
-          await expect(panel.getByText(/2 joueurs/)).toBeVisible();
+          await expect(panel.getByText(/^Salon [A-F0-9]{8} · 2 joueurs$/)).toBeVisible();
           const seats = panel.getByRole('listitem');
           await expect(seats).toHaveCount(2);
           await expect(seats.nth(0)).toContainText(/Camille \(siège 1\).*Alice/);
@@ -154,9 +195,12 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
           await expect(player.getByRole('button', { name: 'Lancer la préparation' })).toHaveCount(0);
           await expect(player.getByText('Camille a lancé la préparation.')).toHaveCount(1);
           await checkBoard(player);
+          await checkScores(player, { twoPlayers: true });
         }
       }
       await checkPreparation();
+      await page.keyboard.press('Tab');
+      await expect(page.getByRole('table', { name: scoreCaption })).toBeFocused();
       await Promise.all([page.reload(), guest.reload()]);
       await checkPreparation();
 
@@ -173,6 +217,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect.poll(() => unavailable.evaluate((image: HTMLImageElement) => image.complete && !image.naturalWidth)).toBe(true);
       await expect(preview.getByText(teaSummary, { exact: true })).toBeVisible();
       await expect(preview.locator('.board-blocker')).toHaveCount(0);
+      await checkScores(guest, { twoPlayers: true, imageLoaded: false });
 
       const newcomer = await otherBrowser.newPage();
       await newcomer.goto(link);
@@ -185,6 +230,55 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await otherBrowser.close();
     }
   } finally {
+    await server.close();
+  }
+});
+
+test('cinq sièges dont quatre simulés : placements lisibles au clavier, aucune chaise bloquée', async ({ page }) => {
+  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)), random: () => 0 });
+  const clients: Socket<ServerEvents, ClientEvents>[] = [];
+  function success<T>(reply: Reply<T>): T {
+    if (!reply.ok) throw new Error(reply.error);
+    return reply.value;
+  }
+  const listening = once(server.http, 'listening');
+  server.http.listen(0, '127.0.0.1');
+  try {
+    await listening;
+    const address = server.http.address();
+    if (!address || typeof address === 'string') throw new Error('Missing server address');
+    const url = `http://127.0.0.1:${address.port}`;
+    await page.goto(url);
+    await page.getByLabel('Votre nom').fill('Camille');
+    await page.getByRole('button', { name: 'Créer le salon' }).click();
+    const code = new URL(await page.getByLabel('Lien du salon').inputValue()).searchParams.get('salon')!;
+    await page.getByRole('button', { name: 'Alice', exact: true }).click();
+    await page.getByRole('button', { name: 'Je suis prêt' }).click();
+    await expect(page.getByRole('button', { name: 'Retirer mon statut prêt' })).toBeEnabled();
+    for (const [i, faction] of FACTION_IDS.slice(1).entries()) {
+      const guest: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
+      clients.push(guest);
+      const { view } = success(await guest.emitWithAck('lobby:join', { code, name: `Invité ${i + 1}` }));
+      const picked = success(await guest.emitWithAck('lobby:action', {
+        type: 'select-faction', actionId: randomUUID(), expectedRevision: view.revision, faction,
+      }));
+      success(await guest.emitWithAck('lobby:action', {
+        type: 'set-ready', actionId: randomUUID(), expectedRevision: picked.revision, ready: true,
+      }));
+    }
+    await expect(page.getByText('Invité 4 est prêt.')).toBeVisible();
+    await page.getByRole('button', { name: 'Camille (siège 1)' }).click();
+    await expect(page.getByRole('table', { name: scoreCaption })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Lancer la préparation' }).click();
+    await expect(page.getByRole('heading', { name: 'Préparation de la partie' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('table', { name: scoreCaption })).toBeFocused();
+    const preview = page.getByRole('region', { name: previewTitle });
+    await expect(preview.getByText(/13 chaises ouvertes\. Aucune chaise bloquée/)).toBeVisible();
+    await expect(preview.locator('.board-blocker')).toHaveCount(0);
+    await checkScores(page, { twoPlayers: false });
+  } finally {
+    for (const client of clients) client.disconnect();
     await server.close();
   }
 });
