@@ -1,6 +1,7 @@
 import { JOURNAL_LIMIT, MAX_PLAYERS } from '@wonderland/shared';
 import type { LobbyAction, LobbyState, LobbyView, Reply } from '@wonderland/shared';
 
+export * from './battle.ts';
 export * from './game.ts';
 
 type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
