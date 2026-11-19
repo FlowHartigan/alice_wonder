@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { gameState } from './game.ts';
 
 export * from './game.ts';
+export * from './regions.ts';
 
 export const MIN_PLAYERS = 2;
 export const MAX_PLAYERS = 5;
