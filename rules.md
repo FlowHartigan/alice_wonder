@@ -154,7 +154,7 @@ Tableau relevé **visuellement** en bas à droite de la p. 5 du PDF FR : chaque 
 
 **WW-WAR-003** — À vérifier, p. 12–13, 22 et 24. Première pioche simultanée obligatoire lors d'un combat disputé. Folie et échec d'abord, puis résoudre les effets des autres jetons, placer ceux qui restent actifs et avancer le repère de Force selon la valeur résolue. Les choix de piocher/abandonner ne doivent pas être diffusés avant l'engagement de tous les joueurs concernés.
 
-**WW-WAR-004** — Arrêt des pioches, validation limitée aux cas 2J ci-dessous. La règle générale (p. 12–13 et 24 FR) met fin au combat si tous ont échoué ou abandonné, si le seul joueur encore en lice est seul en tête, ou si au moins un atteint 25 (égalité si plusieurs au cours de la même pioche). À 2J, voir les [cas établis et les questions bloquantes](#arrêt-du-combat-à-2j--questions-bloquantes), traités séparément des récompenses.
+**WW-WAR-004** — Arrêt des pioches, validation limitée aux cas 2J ci-dessous. La règle générale (p. 12–13 et 24 FR) met fin au combat si tous ont échoué ou abandonné, si le seul joueur encore en lice est seul en tête, ou si au moins un atteint 25 (égalité si plusieurs au cours de la même pioche). À 2J, voir le [critère spécial et sa validation](#ww-war-004--arrêt-des-pioches-à-2j), distincts des récompenses.
 
 **WW-WAR-005** — À vérifier, p. 10, 13 et 22–24. Folie : placer sur la piste et perdre une unité par icône, Chef retiré en dernier. Le Bouclier intact peut annuler le jeton et le renvoyer au sac, en se brisant. L'échec faute d'unités annule la Force, épuise les Actifs, exclut le joueur du combat et répare le Bouclier. Le Poison fait perdre une unité puis retourne au Jabberwocky (ou au sac si contré), sans avancer la piste de Folie.
 
@@ -166,23 +166,24 @@ Tableau relevé **visuellement** en bas à droite de la p. 5 du PDF FR : chaque 
 
 **WW-WAR-009** — À vérifier, p. 12, 14–15 et 21. À 3–5, après détermination de la Force de départ d'un combat disputé, les non-participants peuvent miser simultanément et en secret sur le vainqueur. Réussite : un Allié faible choisi ; erreur : un Éclat ; égalité en tête : ni gain ni pénalité. Vérifier la résolution des paris si tous les combattants échouent.
 
-### Arrêt du combat à 2J — questions bloquantes
+### WW-WAR-004 — Arrêt des pioches à 2J
 
-**Statut de `WW-WAR-004` à 2J : validation documentaire partielle** ([#44](https://github.com/FlowHartigan/alice_wonder/issues/44)). La première pioche et le cas du seul combattant sous le seuil sont établis sur le [livret FR de référence](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416). Les deux cas d'arrêt ci-dessous restent non validés. La synchronisation et l'implémentation relèvent de [#22](https://github.com/FlowHartigan/alice_wonder/issues/22).
+**Statut : Validée pour le projet, dans les seuls cas 2J ci-dessous.** [#44](https://github.com/FlowHartigan/alice_wonder/issues/44) a établi la chronologie de la première pioche et le cas sous le seuil sur le [livret FR `LKY WWR-R01-FR`](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416). [#47](https://github.com/FlowHartigan/alice_wonder/issues/47) consigne l'arbitrage du propriétaire pour l'égalité et la priorité du seuil après abandon, selon la lecture littérale de la p. 21 FR. Cet arbitrage n'est ni un erratum ni une confirmation de l'éditeur.
 
 **Chronologie — validée sur livret FR.** À 2J, même si une seule faction a des unités dans la Région, elle livre bataille contre la Résistance locale (p. 21). Fixer la Force de départ, puis effectuer et résoudre intégralement la première pioche. L'étape de vérification de fin suit la résolution (p. 12 et organigramme « Faire la Guerre », p. 24) : une Force de départ de **5 ou plus au round II** ne déclenche donc pas d'arrêt par la Résistance avant cette pioche. Le choix d'abandonner n'est possible qu'à une « Nouvelle pioche ? », si le combat se poursuit (p. 13 et FAQ « Abandonner un combat », p. 22). L'abandon est irréversible et la Force acquise compte encore ; ce n'est pas un échec, qui ramène la Force à 0 (p. 13).
 
 **Sous le seuil, seule Résistance — validé sur livret FR.** Si le seul combattant reste en lice à **4 après la première pioche** au round II (par exemple Force de départ 3 et jeton résolu à +1), il **peut continuer à piocher** : il n'est pas arrêté du seul fait d'être seul, puisqu'il est encore derrière la Résistance à 5 (exception 2J, p. 21). Ce scénario ne suppose aucun autre combattant humain ayant abandonné.
 
-**Arrêt à égalité — non validé, ne pas coder.** Après la première pioche, le seul combattant encore en lice a **5 face à la Résistance à 5**, sans adversaire humain. La p. 21 FR dit « atteint ou dépasse » : en lecture littérale, le combat s'arrête à 5. Le [livret EN v1.20](https://pakufuda.store/wp-content/uploads/2025/05/SKB-WW-rulebook-1.20.pdf#page=21), p. 21 (« Two-Player Rules / Local Resistance »), dit « have passed » : le dépassement doit être strict, donc le joueur peut continuer à égalité.
+**Critère spécial d'arrêt — arbitrage FR du projet.** Une fois la première pioche entièrement résolue, dès qu'un seul combattant humain est encore en lice et que sa Force atteint ou dépasse la Résistance locale (**3 / 5 / 7** aux rounds I / II / III), le combat s'arrête sans nouvelle pioche. Ce critère spécial suffit, même si le combattant encore en lice n'est pas seul en tête du classement.
 
-Dans sa [réponse du 13 février 2022](https://boardgamegeek.com/thread/2814244/article/39474262#39474262) ([texte original via l'API BGG](https://boardgamegeek.com/api/articles/39474262)), le coauteur Tim Eisner écrit : « If you are tied with the dummy player you can keep drawing until you are in the lead. » La Résistance compte pour déterminer qui est seul en tête, mais n'est pas un joueur actif. Cette clarification éclaire la lecture EN ; ce n'est pas un erratum FR.
+- **À égalité :** au round II, le seul combattant, sans adversaire humain, a **5** après résolution complète de la première pioche. Il atteint la Résistance à 5 : le combat s'arrête.
+- **Après abandon :** au round II, A est seul en lice à **6**, B a abandonné à **8** et la Résistance est à **5**. A s'arrête malgré la Force supérieure de B. B ne repioche pas et conserve sa Force de 8 pour le classement ; l'abandon ne vaut pas échec.
 
-**Arrêt après abandon volontaire — non validé, ne pas coder.** Au round II, A reste en lice à **6**, B a abandonné à **8** et la Résistance est à **5**. Deux lectures FR restent possibles : la règle spéciale de la p. 21 suffit à arrêter A dès lors qu'il a franchi 5 ; ou elle s'ajoute au critère général d'être seul en tête (p. 12–13 et 24), auquel cas A peut continuer puisqu'il n'a pas dépassé la Force conservée par B. Ne pas assimiler B à un joueur absent ou ayant échoué, ni déduire de la clarification de Tim quelle règle prime en FR.
+*Note historique ([#44](https://github.com/FlowHartigan/alice_wonder/issues/44)) : le [livret EN v1.20, p. 21](https://pakufuda.store/wp-content/uploads/2025/05/SKB-WW-rulebook-1.20.pdf#page=21) et la [réponse de Tim Eisner](https://boardgamegeek.com/thread/2814244/article/39474262#39474262) permettent de repiocher à égalité avec la Résistance. Cette lecture EN n'est pas normative pour le FR ; aucun erratum FR applicable à ces deux cas n'a été identifié dans la vérification de #44.*
 
-**Récompenses après la fin du combat — rappel uniquement.** Selon la p. 21 FR et [`WW-COUNT-001`](#ww-count-001--exceptions-à-deux-joueurs), une Force **finale** de 4 au round II ne donne pas de récompense de conquête ; une Force finale de 5 remplit le seuil d'éligibilité. Ce seuil ne détermine ni la permission de repiocher ni le moment de l'arrêt.
+**Récompenses après la fin du combat — rappel uniquement.** Selon la p. 21 FR et [`WW-COUNT-001`](#ww-count-001--exceptions-à-deux-joueurs), une Force **finale** de 4 au round II ne donne pas de récompense de conquête ; une Force finale de 5 remplit le seuil d'éligibilité. Ce contrôle d'éligibilité ne détermine ni le droit de repiocher, ni le moment de l'arrêt, ni le rang (`WW-WAR-007`). Le barème reste inchangé.
 
-**Validation requise.** Aucun erratum officiel applicable à ces deux cas d'arrêt FR n'a été identifié dans les sources consultées. Demander à Lucky Duck Games de clarifier l'égalité et la priorité après abandon pour l'édition FR. À défaut, demander un arbitrage explicite du propriétaire du projet et le consigner comme décision produit, distincte de la règle officielle FR. D'ici là, conserver les deux cas non validés dans ce référentiel, sans comportement par défaut ni codage dans #22. Voir la [recette documentaire](docs/rules-coverage.md#recette-documentaire-de-larrêt-des-pioches-à-2j).
+Voir la [recette documentaire](docs/rules-coverage.md#recette-documentaire-de-larrêt-des-pioches-à-2j). L'implémentation, la synchronisation et les tests automatisés du cycle de combat restent à faire dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22).
 
 ## 5. Sac et jetons — À vérifier
 
@@ -253,7 +254,7 @@ Source et tests : ...
 
 ### WW-COUNT-001 — Exceptions à deux joueurs
 
-**Statut : Validée pour la préparation 2J établie ci-dessous (livret p. 4–5 et 21), hors ordre du filtrage du marché et données individuelles non établies.** Les règles de jeu résumées ensuite sont `Documentées`, hors validation de ce jalon de préparation ; voir [`WW-WAR-004`](#arrêt-du-combat-à-2j--questions-bloquantes) pour la validation partielle de l'arrêt des pioches dans [#44](https://github.com/FlowHartigan/alice_wonder/issues/44).
+**Statut : Validée pour la préparation 2J établie ci-dessous (livret p. 4–5 et 21), hors ordre du filtrage du marché et données individuelles non établies.** Les règles de jeu résumées ensuite sont `Documentées`, hors validation de ce jalon de préparation ; voir [`WW-WAR-004`](#ww-war-004--arrêt-des-pioches-à-2j) pour la validation distincte des cas d'arrêt des pioches à 2J.
 
 - **Marché :** retirer l'**Amulette de la Duchesse** et le **Lièvre de Mars** du paquet Pays des Merveilles (p. 21). Le marché initial doit donc compter trois cartes autorisées, avec le matériel correspondant ; ne pas y installer la paire de jetons Objet de l'Amulette ni la silhouette du Lièvre. Retirer les deux cartes **avant** mélange et révélation est une proposition de déroulé, **non validée** : p. 21 ne situe pas le retrait par rapport aux étapes 4–5, et ne précise ni comment traiter une carte exclue déjà révélée ni où ranger son matériel.
 - **Région :** au renvoi de la p. 4 étape 11, révéler 1 Quête au hasard : sa Région d'Exploit devient inutilisée. Retirer toutes les Quêtes de cette Région, y compris celle révélée, et son marqueur Score posé au hasard ; ne pas y placer d'unité ni de Château et ne pas y combattre. Placer Premier combat dans la Région suivante en sens horaire **avant** le lancer, puis avancer du résultat du dé sans compter la Région retirée. La Quête utilisée pour le tirage de Région est révélée publiquement, pas les Quêtes initiales conservées.
@@ -311,7 +312,6 @@ Pour chaque action jouable, l'implémentation doit préciser :
 4. Lucky Duck Games signale-t-il un erratum pour le tirage FR relevé ? Aucun applicable n'a été trouvé dans les sources consultées (§0).
 5. Quels textes et traductions doivent être utilisés dans l'interface ?
 6. À 2J, quand retirer les deux cartes du marché par rapport aux étapes 4–5 ? Voir `WW-SETUP-004` et `WW-COUNT-001`.
-7. Faire clarifier pour l'édition FR, ou arbitrer explicitement, les [deux cas d'arrêt non validés de `WW-WAR-004`](#arrêt-du-combat-à-2j--questions-bloquantes) : égalité avec la Résistance et priorité du seuil après abandon. Ne pas les coder dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22) avant cette validation.
 
 ## 13. Tableau de suivi
 
@@ -325,7 +325,7 @@ Pour chaque action jouable, l'implémentation doit préciser :
 | Factions et pouvoirs | À vérifier | Non démarrée | Non démarrés |
 | Cartes et quêtes | À vérifier | Non démarrée | Non démarrés |
 | Scores et fin de partie | À vérifier | Non démarrée | Non démarrés |
-| Règles à deux joueurs | Préparation établie validée · ordre du filtre non validé · arrêt des pioches partiellement validé (#44), deux cas bloqués pour #22 | Non démarrée | Recettes documentaires de la préparation et de l'arrêt des pioches |
+| Règles à deux joueurs | Préparation établie validée · ordre du filtre non validé · cas d'arrêt des pioches validés pour le projet ([#47](https://github.com/FlowHartigan/alice_wonder/issues/47)) | Non démarrée | Recettes documentaires de la préparation et de l'arrêt des pioches ; tests moteur du combat à faire dans [#22](https://github.com/FlowHartigan/alice_wonder/issues/22) |
 
 ---
 
