@@ -218,14 +218,14 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
       you: joined.view.you, revision: ready.revision + 1, players: ready.players, firstPlayerId: joined.view.you,
       preparation: prepared.preparation, canSetReady: false, canSelectFirstPlayer: false, launch: null,
     });
-    expect(prepared.preparation).toEqual({ gameId: expect.any(String) });
+    expect(prepared.preparation).toEqual({ gameId: expect.any(String), teaTable: { openChairs: 11, activeBlockers: ['4J', '5J'] } });
     expect(guestView).not.toHaveProperty('game');
     expect(JSON.stringify(guestView)).not.toContain(created.session.token);
     expect(JSON.stringify(guestView)).not.toContain(joined.session.token);
     expect(prepared.journal.filter(({ type }) => type === 'launch-preparation')).toHaveLength(1);
     const persisted = databaseContents(db);
     const snapshot = lobbyState.parse(JSON.parse(String(persisted.rooms[0].snapshot)));
-    expect(gameState.parse(snapshot.game)).toEqual({ ...prepared.preparation, version: 1, revision: 0,
+    expect(gameState.parse(snapshot.game)).toEqual({ gameId: prepared.preparation?.gameId, version: 1, revision: 0,
       phase: { type: 'setup' }, playerIds: ready.players.map(({ id }) => id), history: [], decisions: [] });
     expect(persisted.sessions).toEqual(before.sessions);
     expect(persisted.receipts).toHaveLength(before.receipts.length + 1);
@@ -260,6 +260,51 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
     expect(success(await hostRestored.emitWithAck('lobby:action', requests[winner]))).toEqual(prepared);
     expect(databaseContents(db)).toEqual(persisted);
   } finally { db.close(); }
+});
+
+it.each([
+  { count: 2, openChairs: 11, activeBlockers: ['4J', '5J'] },
+  { count: 3, openChairs: 11, activeBlockers: ['4J', '5J'] },
+  { count: 4, openChairs: 12, activeBlockers: ['5J'] },
+  { count: 5, openChairs: 13, activeBlockers: [] },
+])('projette les mêmes chaises à $count sièges au lancement, à la reconnexion et après restauration', async ({ count, ...teaTable }) => {
+  const database = tempDatabase();
+  const url = await start(database);
+  const seats = await Promise.all(Array.from({ length: count }, () => connect(url)));
+  const [host, ...guests] = seats;
+  const created = success(await host.emitWithAck('lobby:create', { name: 'Camille' }));
+  const { code } = created.session;
+  const sessions = [created.session];
+  let view = created.view;
+  for (const [i, guest] of guests.entries()) {
+    const joined = success(await guest.emitWithAck('lobby:join', { code, name: `Invité ${i + 1}` }));
+    sessions.push(joined.session);
+    view = joined.view;
+  }
+  for (const [i, socket] of seats.entries()) {
+    view = success(await socket.emitWithAck('lobby:action', selectFaction(FACTION_IDS[i], view.revision)));
+    view = success(await socket.emitWithAck('lobby:action', setReady(true, view.revision)));
+  }
+  const guestsSawChoice = Promise.all(guests.map(nextUpdate));
+  view = success(await host.emitWithAck('lobby:action', selectFirstPlayer(created.view.you, view.revision)));
+  expect(view.preparation).toBeNull();
+  await guestsSawChoice;
+  const guestViews = Promise.all(guests.map(nextUpdate));
+  const prepared = success(await host.emitWithAck('lobby:action', launch(view.revision)));
+  const allViews = [prepared, ...await guestViews];
+  for (const current of allViews) {
+    expect(current.preparation).toEqual({ gameId: prepared.preparation?.gameId, teaTable });
+    expect(current).not.toHaveProperty('game');
+  }
+  for (const guest of guests) guest.disconnect();
+  expect(success(await host.emitWithAck('lobby:resume', created.session))).toEqual(prepared);
+  const returned = await connect(url);
+  expect(success(await returned.emitWithAck('lobby:resume', sessions[1]))).toEqual(allViews[1]);
+  await stop();
+  const restoredUrl = await start(database);
+  const restored = await Promise.all(sessions.map(async (session) =>
+    success(await (await connect(restoredUrl)).emitWithAck('lobby:resume', session))));
+  expect(restored).toEqual(allViews);
 });
 
 it.each(['simultanément', 'après admission'] as const)('arbitre un lancement %s face à une nouvelle admission', async (order) => {

@@ -111,6 +111,10 @@ Les numéros en gras renvoient aux étapes imprimées p. 4 ; les étapes conséc
 - **10.** Mélanger les Quêtes et poser la pioche face cachée.
 - **11.** À 3–5J, poser Premier combat au Donjon rouge, puis lancer le dé Éclat et avancer d'autant de Régions en sens horaire. À 2J, retirer la Région tirée, ses Quêtes et son marqueur Score, puis placer et déplacer Premier combat selon `WW-COUNT-001`. Ce lancer ne distribue pas d'Éclats. Préparer ensuite les factions ; avant le premier Thé, toutes les Régions sont sans unité ni Château.
 
+**Périmètre web ([#54](https://github.com/FlowHartigan/alice_wonder/issues/54)) : étape 7 uniquement.** Livret FR `LKY WWR-R01-FR`, p. 4 étape 7 et p. 21 ; voir `WW-COUNT-001/002`. Sur 13 chaises, 2 ou 3 sièges admis laissent 11 chaises ouvertes (4J et 5J bloquées), 4 sièges en laissent 12 (5J bloquée), 5 sièges en laissent 13 (aucune bloquée). Ni le Bout de Table ni l'emplacement de la pioche ne comptent. L'effectif est figé au lancement, indépendamment des connexions. Une chaise ouverte n'a pas encore de carte : aucun tirage, mélange ni autre étape de mise en place n'est exécuté par cet aperçu.
+
+**Repérage visuel :** sur le [plateau FR du dépôt](assets/official/plateau-principal-fr.webp) dérivé du livret p. 2, les pictogrammes imprimés 4 et 5 sont côte à côte sur le bord supérieur de la table du Thé. Les centres des badges 4J et 5J sont respectivement à environ 55,4 % et 63,1 % de la largeur depuis la gauche, tous deux à 24,1 % de la hauteur depuis le haut du WebP entier. Ce sont des coordonnées de présentation, pas des données du moteur.
+
 **Contrôle :** avec un marché d'essai mêlant Habitant et Objet, obtenir 3 cartes correctement équipées. À 4J avec un résultat de dé 2, conserver le bloqueur sur 5J et placer Premier combat au Jardin des Fleurs vivantes, sans ajouter d'Éclats aux joueurs.
 
 ### WW-SETUP-005 — Initiative et Éclats du round I

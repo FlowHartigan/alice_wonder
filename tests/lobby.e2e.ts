@@ -1,7 +1,38 @@
 import { once } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { expect, firefox, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { makeServer } from '../apps/server/src/server.ts';
+
+const previewTitle = 'Aperçu du plateau — lecture seule';
+const teaSummary = 'Table du Thé : 11 chaises ouvertes. Chaises 4J et 5J bloquées. Aucune carte n’est installée.';
+
+async function checkBoard(player: Page) {
+  const preview = player.getByRole('region', { name: previewTitle });
+  const image = preview.getByRole('img', { name: /Plateau central officiel en français/ });
+  await expect(preview.getByText(teaSummary, { exact: true })).toBeVisible();
+  await expect(image).toHaveAccessibleDescription(teaSummary);
+  await expect(image).toHaveAttribute('src', /plateau-principal-fr.*\.webp$/);
+  await expect.poll(() => image.evaluate((element: HTMLImageElement) =>
+    [element.complete, element.naturalWidth, element.naturalHeight])).toEqual([true, 2400, 1637]);
+  const imageBox = await image.boundingBox();
+  if (!imageBox) throw new Error('Plateau non visible');
+  expect(imageBox.width / imageBox.height).toBeCloseTo(2400 / 1637, 2);
+  expect(imageBox.x + imageBox.width).toBeLessThanOrEqual(player.viewportSize()!.width);
+
+  const badges = preview.locator('.board-blocker');
+  await expect(badges).toHaveText(['4J', '5J']);
+  for (const [index, x] of [0.554, 0.631].entries()) {
+    const badge = badges.nth(index);
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveCSS('pointer-events', 'none');
+    const box = await badge.boundingBox();
+    if (!box) throw new Error('Bloqueur non visible');
+    expect((box.x + box.width / 2 - imageBox.x) / imageBox.width).toBeCloseTo(x, 3);
+    expect((box.y + box.height / 2 - imageBox.y) / imageBox.height).toBeCloseTo(0.241, 3);
+  }
+  await expect(preview.locator('a, button, input, select, textarea, canvas, [tabindex], [role=button]')).toHaveCount(0);
+}
 
 test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la retrouvent', async ({ page }) => {
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)) });
@@ -28,7 +59,8 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       const link = await page.getByLabel('Lien du salon').inputValue();
       expect([...new URL(link).searchParams.keys()]).toEqual(['salon']);
 
-      const guest = await otherBrowser.newPage();
+      const guestContext = await otherBrowser.newContext();
+      let guest = await guestContext.newPage();
       await guest.goto(link);
       await guest.getByLabel('Votre nom').fill('Dinah');
       await guest.getByRole('button', { name: 'Rejoindre le salon' }).click();
@@ -100,6 +132,9 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(guest.getByText('Camille est prêt.')).toBeVisible();
       await guestReady.click();
       await expect(launch).toBeEnabled();
+      for (const player of [page, guest]) {
+        await expect(player.getByRole('region', { name: previewTitle })).toHaveCount(0);
+      }
       await launch.focus();
       await page.keyboard.press('Enter');
       await page.keyboard.press('Enter');
@@ -118,11 +153,26 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
           await expect(player.getByRole('region', { name: 'Premier joueur' })).toHaveCount(0);
           await expect(player.getByRole('button', { name: 'Lancer la préparation' })).toHaveCount(0);
           await expect(player.getByText('Camille a lancé la préparation.')).toHaveCount(1);
+          await checkBoard(player);
         }
       }
       await checkPreparation();
       await Promise.all([page.reload(), guest.reload()]);
       await checkPreparation();
+
+      await guest.close();
+      guest = await guestContext.newPage();
+      await guest.setViewportSize({ width: 320, height: 720 });
+      await guest.goto(link);
+      await checkPreparation();
+
+      await guest.route('**/plateau-principal-fr*.webp', (route) => route.abort());
+      await guest.reload();
+      const preview = guest.getByRole('region', { name: previewTitle });
+      const unavailable = preview.getByRole('img', { name: /Plateau central officiel en français/ });
+      await expect.poll(() => unavailable.evaluate((image: HTMLImageElement) => image.complete && !image.naturalWidth)).toBe(true);
+      await expect(preview.getByText(teaSummary, { exact: true })).toBeVisible();
+      await expect(preview.locator('.board-blocker')).toHaveCount(0);
 
       const newcomer = await otherBrowser.newPage();
       await newcomer.goto(link);
@@ -130,6 +180,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await newcomer.getByRole('button', { name: 'Rejoindre le salon' }).click();
       await expect(newcomer.getByRole('alert')).toContainText('Le salon est fermé aux nouvelles admissions');
       await expect(newcomer.getByRole('region', { name: 'Préparation de la partie' })).toHaveCount(0);
+      await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
     } finally {
       await otherBrowser.close();
     }

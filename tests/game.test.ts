@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { applyGameAction, privatePlayerView, publicGameView, shuffle } from '@wonderland/game-engine';
+import { applyGameAction, initializeGame, privatePlayerView, publicGameView, shuffle, teaTableForSetup } from '@wonderland/game-engine';
 import { gameState } from '@wonderland/shared';
 import type { GameAction, GamePhase, GameState } from '@wonderland/shared';
 
@@ -37,6 +37,18 @@ function accepted(result: ReturnType<typeof applyGameAction>) {
   if (!result.ok) throw new Error(result.error);
   return result;
 }
+
+it.each([
+  { count: 2, openChairs: 11, activeBlockers: ['4J', '5J'] },
+  { count: 3, openChairs: 11, activeBlockers: ['4J', '5J'] },
+  { count: 4, openChairs: 12, activeBlockers: ['5J'] },
+  { count: 5, openChairs: 13, activeBlockers: [] },
+])('WW-SETUP-004 / WW-COUNT-001/002 : table du Thé à $count joueurs', ({ count, ...expected }) => {
+  const state = initializeGame(gameId, Array.from({ length: count }, (_, i) => id(i + 2)));
+  const before = structuredClone(state);
+  expect(teaTableForSetup(state)).toEqual(expected);
+  expect(state).toEqual(before);
+});
 
 it('rejoue les mêmes intentions et événements à partir du même hasard injecté', () => {
   function run(values: number[]) {

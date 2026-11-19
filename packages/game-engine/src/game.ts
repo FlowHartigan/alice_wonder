@@ -1,5 +1,5 @@
 import { gameAction, gameState } from '@wonderland/shared';
-import type { GamePhase, GameState, PrivateGameEvent, PrivatePlayerView, PublicGameView } from '@wonderland/shared';
+import type { GamePhase, GameState, PrivateGameEvent, PrivatePlayerView, PublicGameView, TeaTableSetupView } from '@wonderland/shared';
 
 /** Server context resolved from an authenticated session, never from the command. */
 export type GameSeat = Readonly<{ gameId: string; playerId: string }>;
@@ -13,6 +13,14 @@ export function initializeGame(gameId: string, playerIds: string[]): GameState {
   return gameState.parse({
     version: 1, gameId, playerIds, revision: 0, phase: { type: 'setup' }, decisions: [], history: [],
   });
+}
+
+/** WW-SETUP-004 (étape 7), WW-COUNT-001/002. Excludes the Bout de Table and the deck space. */
+export function teaTableForSetup({ playerIds }: GameState): TeaTableSetupView {
+  const activeBlockers: TeaTableSetupView['activeBlockers'] = [];
+  if (playerIds.length < 4) activeBlockers.push('4J');
+  if (playerIds.length < 5) activeBlockers.push('5J');
+  return { openChairs: 13 - activeBlockers.length, activeBlockers };
 }
 
 // In a validated snapshot, exact membership also rejects non-canonical session IDs.

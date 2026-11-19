@@ -132,12 +132,13 @@ export const lobbyState = lobbySnapshot.refine(({ firstPlayerId, players }) => (
 export type LobbyState = z.infer<typeof lobbyState>;
 export type LobbyAction = z.infer<typeof lobbyAction>;
 export type Session = z.infer<typeof credentials>;
+export type TeaTableSetupView = { openChairs: number; activeBlockers: ('4J' | '5J')[] };
 export type LobbyView = Pick<LobbyState, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players' | 'journal'> & {
   you: string;
   canSetReady: boolean;
   canSelectFirstPlayer: boolean;
   launch: { blockers: LaunchBlocker[] } | null;
-  preparation: { gameId: string } | null;
+  preparation: { gameId: string; teaTable: TeaTableSetupView } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };
 export type Reply<T> = { ok: true; value: T } | { ok: false; error: ErrorCode };
