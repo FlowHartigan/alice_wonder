@@ -113,6 +113,8 @@ Les numéros en gras renvoient aux étapes imprimées p. 4 ; les étapes conséc
 
 **Périmètre web des chaises ([#54](https://github.com/FlowHartigan/alice_wonder/issues/54)) : étape 7.** Livret FR `LKY WWR-R01-FR`, p. 4 étape 7 et p. 21 ; voir `WW-COUNT-001/002`. Sur 13 chaises, 2 ou 3 sièges admis laissent 11 chaises ouvertes (4J et 5J bloquées), 4 sièges en laissent 12 (5J bloquée), 5 sièges en laissent 13 (aucune bloquée). Ni le Bout de Table ni l'emplacement de la pioche ne comptent. L'effectif est figé au lancement, indépendamment des connexions. Une chaise ouverte n'a pas encore de carte. L'aperçu montre aussi l'affectation initiale de l'étape 2 ([#59](https://github.com/FlowHartigan/alice_wonder/issues/59), `WW-MAP-004`), sans exécuter de tirage côté client.
 
+**Périmètre moteur 2J ([#61](https://github.com/FlowHartigan/alice_wonder/issues/61)) : étapes 10–11.** L'étape 10 fournit une pioche déjà mélangée ; seul le retrait régional de l'étape 11 est calculé, sans placement de Premier combat ni lancer de dé. Voir le [contrat 2J](#retrait-régional-initial-au-moteur-2j).
+
 **Repérage visuel :** sur le [plateau FR du dépôt](assets/official/plateau-principal-fr.webp) dérivé du livret p. 2, les pictogrammes imprimés 4 et 5 sont côte à côte sur le bord supérieur de la table du Thé. Les centres des badges 4J et 5J sont respectivement à environ 55,4 % et 63,1 % de la largeur depuis la gauche, tous deux à 24,1 % de la hauteur depuis le haut du WebP entier. Ce sont des coordonnées de présentation, pas des données du moteur.
 
 **Contrôle :** avec un marché d'essai mêlant Habitant et Objet, obtenir 3 cartes correctement équipées. À 4J avec un résultat de dé 2, conserver le bloqueur sur 5J et placer Premier combat au Jardin des Fleurs vivantes, sans ajouter d'Éclats aux joueurs.
@@ -247,7 +249,7 @@ Le graphe est non orienté ; le circuit est orienté et revient du Comté au Don
 
 **Intégration web [#59](https://github.com/FlowHartigan/alice_wonder/issues/59) — Validée pour l'affectation initiale uniquement.** Après validation du lancement à 2–5J, le serveur mélange une fois les six pièces, sauvegarde l'affectation et n'affiche aux sièges admis que les cinq placements et leurs PV I/II/III (livret FR p. 2, p. 4 étape 2 et p. 14). Sur le [WebP FR](assets/official/plateau-principal-fr.webp), les badges centrés sur les groupes de trois ronds près des noms imprimés ont pour coordonnées x/y (en % du WebP entier depuis le haut gauche) : Donjon rouge 87,4/67,1 ; Forêt de Tulgey 56,9/89,2 ; Jardin des Fleurs vivantes 11,2/63,2 ; Mare de Larmes 11,3/51,6 ; Comté de la Déraison 88,6/55,8. Ces positions n'affectent pas les règles. Voir la [recette](docs/rules-coverage.md#recette-des-placements-au-lancement).
 
-À 2J, les cinq placements initiaux restent affichés : la région et son marqueur ne seront retirés qu'à l'étape Quête (p. 21 étape 3 ; [#10](https://github.com/FlowHartigan/alice_wonder/issues/10) / [#12](https://github.com/FlowHartigan/alice_wonder/issues/12)). Ici, aucune Quête n'est tirée, aucune Région n'est désignée ou retirée, aucun PV n'est attribué (`WW-WAR-007`) et le Thé ne démarre pas.
+À 2J, l'aperçu continue d'afficher les cinq placements initiaux. Le [retrait du marqueur déjà posé](#retrait-régional-initial-au-moteur-2j) est calculé séparément par le moteur (p. 21 étape 3), sans remélanger ni réaffecter. Il n'est pas déclenché par le lancement web : aucune Quête n'y est tirée, aucune Région n'y est retirée, aucun PV n'est attribué (`WW-WAR-007`) et le Thé ne démarre pas.
 
 ## 7. Factions et asymétrie — Validation partielle
 
@@ -307,6 +309,19 @@ Source et tests : ...
 - **Plateaux et ressources :** bloquer les deux chaises 4J/5J ; prendre la face au cadre doré « 2 JOUEURS » en bas à gauche. Ajouter un jeton Forge dans chaque sac, ne distribuer aucune carte Pari, donner 4 Poison si le Jabberwocky joue et appliquer la ligne d'Éclats 2/1. Réserver le cube d'une faction non jouée pour la Résistance locale ; les deux cubes des joueurs vont sur Combat 0. Le cube réservé est posé sur **3 / 5 / 7** au début de la Guerre du round I / II / III, pas au départ du Thé I (p. 21).
 
 **Contrôle de préparation :** avec le Donjon rouge révélé et un dé de 2, partir de la Forêt de Tulgey et finir à la Mare de Larmes ; après le Comté, le circuit reprend à la Forêt. Vérifier le résultat des exclusions au marché et dans les Quêtes, les faces 2J, le cube distinct, les 11 jetons par sac et l'absence de cartes Pari. Le relevé des cinq faces et le nombre de Quêtes à retirer par Région nécessitent un catalogue FR ; l'adjacence pour les effets hors circuit des combats n'est pas déduite du saut de Région.
+
+#### Retrait régional initial au moteur (2J)
+
+**Règle validée, données FR encore à vérifier.** Livret de base FR `LKY WWR-R01-FR` p. 2–3 (30 Quêtes), p. 4 étapes 10–11 (`WW-SETUP-004`) et p. 21 étapes 1–3 (`WW-COUNT-001`, `WW-MAP-004`). `resolveTwoPlayerRegionSetup` prend deux données internes, jamais une charge utile client :
+
+- `shuffledQuestDeck` : les 30 Quêtes de base complètes, déjà mélangées, dessus à l'index 0. Chaque carte porte un ID textuel non blanc, unique par égalité exacte, et un `exploitRegionId` du catalogue existant. Aucune région n'est déduite d'un ID de Quête et aucune ventilation n'est imposée.
+- `initialRegionScores` : l'inventaire strict de #59, avec un placement par Région et les six IDs de marqueurs distincts du catalogue, dont cinq posés et un rangé. Un inventaire déjà filtré est invalide.
+
+Une entrée hors contrat est refusée par `TypeError`. Le futur appelant garantit la phase de préparation et l'effectif de deux joueurs ainsi que la provenance et le mélange de la pioche. Le moteur ne vérifie pas la composition éditoriale du paquet.
+
+Le résultat interne désigne la Quête du dessus et sa Région, puis répartit les cartes entre le lot écarté et la pioche restante, sans mutation, remélange ni hasard. Les deux lots conservent l'ordre relatif et les références des cartes ; la Quête révélée désigne une carte du lot écarté, pas une carte supplémentaire. Les quatre placements Score conservés restent dans leur ordre initial, le placement retiré est isolé, le sixième reste rangé. `getActiveRegionCircuit` et `getActiveRegionNeighbors` reçoivent la Région écartée : le circuit démarre à la Région suivante, le graphe ne gagne aucune arête. Aucun placement de Premier combat ni lancer de dé n'est exécuté.
+
+Selon la règle, la révélation de la Quête du dessus est publique ; la pioche restante et son ordre restent cachés. Le résultat complet ne doit pas être projeté. Aucun événement réseau, stockage ni affichage n'est ajouté. L'activation dépend du [catalogue FR vérifié (#10)](docs/rules-coverage.md#barrière-dactivation-catalogue-fr-des-quêtes) ; la préparation complète reste à intégrer en [#12](https://github.com/FlowHartigan/alice_wonder/issues/12). Voir les [tests du retrait 2J](docs/rules-coverage.md#tests-du-retrait-régional-initial-à-2j).
 
 #### Règles de jeu 2J — hors recette de préparation
 
