@@ -213,15 +213,33 @@ Voir la [recette documentaire](docs/rules-coverage.md#recette-documentaire-de-la
 
 **WW-BAG-005** — À vérifier, p. 9–10, 13 et 22–23. Les jeux d'Alliés A à D attribuent des effets différents aux mêmes familles de jetons ; la force modifiée d'un jeton ne se conserve pas pour une future pioche. Dresser le catalogue des effets et dépendances, y compris Folie et Poison (`WW-WAR-005`).
 
-## 6. Régions, unités et châteaux — À vérifier
+## 6. Régions, unités et châteaux — Validation partielle
 
-**WW-MAP-001** — À vérifier, p. 4, 7, 21–22 et plateau. Cinq Régions dans le jeu de base ; ajouter au graphe l'adjacence entre Mare de Larmes et Comté de la Déraison. Relever l'ordre horaire, les noms et la géométrie sur le plateau physique.
+### WW-MAP-001 — Catalogue des Régions
+
+**Statut : Validée pour les noms, les adjacences du plateau complet et le circuit horaire ([#57](https://github.com/FlowHartigan/alice_wonder/issues/57)).** Sources : [livret Lucky Duck Games FR `LKY WWR-R01-FR`](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416) et [plateau FR du dépôt](assets/official/plateau-principal-fr.webp), dérivé de la p. 2. La p. 7 (« S'aventurer dans le Pays des Merveilles ») confirme les cinq Régions périphériques. Le glossaire p. 22 (« Adjacence », repris p. 24) confirme le voisinage des Régions côte à côte et l'arête Mare–Comté, malgré l'espace de la piste de Combat entre elles. Aucune inspection du plateau physique ni validation de coordonnées graphiques.
+
+| Position horaire (depuis le Donjon) | Région | ID stable | Voisines sur le plateau complet |
+|---|---|---|---|
+| 1 | Donjon rouge | `donjon-rouge` | Comté, Forêt |
+| 2 | Forêt de Tulgey | `foret-de-tulgey` | Donjon, Jardin |
+| 3 | Jardin des Fleurs vivantes | `jardin-des-fleurs-vivantes` | Forêt, Mare |
+| 4 | Mare de Larmes | `mare-de-larmes` | Jardin, Comté |
+| 5 | Comté de la Déraison | `comte-de-la-deraison` | Mare, Donjon |
+
+Le graphe est non orienté ; le circuit est orienté et revient du Comté au Donjon. La p. 4 étape 11 situe le départ de Premier combat au Donjon pour 3–5J ; la p. 12 (« Combats ») confirme le sens horaire du parcours des Régions. Les ID sont des conventions du catalogue logiciel v1, indépendantes de l'illustration.
+
+**WW-SETUP-004 / WW-COUNT-001 — Validée pour l'exclusion régionale et son parcours à 2J.** La p. 4 étape 11 renvoie à la p. 21, « Mise en place », étapes 1–4. À partir de l'ID de la Région déjà désignée par la Quête, le circuit actif commence à la Région suivante, avant le lancer, et saute la Région exclue. Exclure le Donjon donne Forêt → Jardin → Mare → Comté → Forêt ; deux pas depuis la Forêt donnent la Mare. La Région écartée est absente du parcours et n'a aucun voisin actif ; le graphe actif ne conserve que les arêtes entre Régions encore en jeu, sans ajouter Comté–Forêt. C'est un filtrage des données, pas une interprétation de l'« ordre du combat » pour la Carte soldat B (p. 23), dont l'effet n'est pas implémenté ici. Le catalogue complet reste inchangé. Pas de tirage de Quête ni de dé, d'affectation de marqueur, de placement, de combat ou de score exécuté. Voir les [tests du catalogue](docs/rules-coverage.md#vérification-du-catalogue-des-régions).
 
 **WW-MAP-002** — À vérifier, p. 7–8, 12–13, 21–22. Les Partisans, Habitants et Chefs sont des unités ; les Châteaux n'en sont pas. Les placements liés au Thé et les retraits liés au combat sont décrits par `WW-TEA-004` et `WW-WAR-005`. Les unités perdues ne restent pas dans la Région ; vérifier la destination et l'éligibilité des Chefs aux effets spécifiques.
 
 **WW-MAP-003** — À vérifier, p. 8, 12, 14–15 et 21. Maximum un Château par faction et par Région ; construction par effet ou conquête. Il donne 2 de Force de départ à son propriétaire participant et des PV en fin de partie, dépendants de la piste de Forge. À deux, construction en deux étapes et valeur finale des seuls Châteaux redressés.
 
-**WW-MAP-004** — À vérifier, p. 12, 14 et 21. Le score de conquête est imprimé par Région et par round sur le marqueur assigné ; utiliser `WW-WAR-007` pour le classement et la récompense. Un Château ne donne pas à lui seul le droit de participer au combat suivant.
+### WW-MAP-004 — Marqueurs Score de Région
+
+**Statut : catalogue des six barèmes à vérifier, non implémenté ([#8](https://github.com/FlowHartigan/alice_wonder/issues/8), hors [#57](https://github.com/FlowHartigan/alice_wonder/issues/57)).** Le livret FR p. 2 compte six marqueurs, distincts des cinq Régions. P. 4 étape 2, ils sont mélangés : cinq sont attribués au hasard, le dernier est rangé. P. 21 étape 3, on enlève aussi le marqueur attribué à la Région exclue en 2J. P. 14 (« Conquête de Région et Château »), le marqueur se lit de gauche à droite : PV des rounds I, II et III. Les valeurs ne sont donc pas des propriétés fixes des Régions. Le classement et la récompense restent hors de ce relevé (`WW-WAR-007`), comme la participation des Châteaux seuls (p. 12).
+
+Le [relevé des illustrations FR](docs/rules-coverage.md#vérification-du-catalogue-des-régions) donne sept triplets distincts pour six pièces annoncées ; il ne permet pas de sélectionner les six barèmes du matériel. Il faut un relevé lisible des six pièces (et de leurs faces pertinentes) d'une boîte de base FR identifiée par sa référence et son tirage, ou un inventaire / une confirmation de l'éditeur applicable à cette édition. Aucun barème n'est codé ni déduit d'une autre édition.
 
 ## 7. Factions et asymétrie — Validation partielle
 
@@ -343,7 +361,7 @@ Pour chaque action jouable, l'implémentation doit préciser :
 | Phase de Thé | À vérifier | Non démarrée | Non démarrés |
 | Phase de Guerre | À vérifier | Non démarrée | Non démarrés |
 | Sacs et jetons | À vérifier | Non démarrée | Non démarrés |
-| Régions et châteaux | À vérifier | Non démarrée | Non démarrés |
+| Régions et châteaux | Noms, graphe et circuit 2J validés ; barèmes, unités et Châteaux à vérifier | Catalogue des Régions et filtrage seulement | [Tests unitaires](docs/rules-coverage.md#vérification-du-catalogue-des-régions) |
 | Factions et pouvoirs | Liste validée ; pouvoirs et capacités à vérifier | Liste et exclusivité en salon | [Recette du choix de faction](docs/rules-coverage.md#recette-du-choix-de-faction-en-salon) |
 | Cartes et quêtes | À vérifier | Non démarrée | Non démarrés |
 | Scores et fin de partie | À vérifier | Non démarrée | Non démarrés |
