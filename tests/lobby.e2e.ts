@@ -51,7 +51,7 @@ async function checkPhaseReference(player: Page) {
   await expect(player.getByRole('region', { name: 'Préparation de la partie' }).getByRole('button')).toHaveCount(0);
 }
 
-async function checkLeaders(player: Page, expected: [string, string][], imageLoaded = true) {
+async function checkLeaders(player: Page, expected: [string, string][], { imageLoaded = true, compact = false } = {}) {
   const list = leadersList(player);
   await expect(list).toBeVisible();
   await expect(list.getByRole('listitem')).toHaveText(expected.map(([name, code]) => `${name} (${code})`));
@@ -68,13 +68,14 @@ async function checkLeaders(player: Page, expected: [string, string][], imageLoa
   const image = await player.getByRole('img', { name: boardName }).boundingBox();
   if (!image) throw new Error('Plateau introuvable');
   for (const marker of await markers.all()) {
+    await expect(marker).toBeVisible();
     const box = await marker.boundingBox();
     if (!box) throw new Error('Repère de Chef introuvable');
-    // Inside the printed end-of-table area: between the deck and bottom chair, left of the Comté.
-    expect((box.x - image.x) / image.width).toBeGreaterThan(0.74);
-    expect((box.x + box.width - image.x) / image.width).toBeLessThan(0.835);
-    expect((box.y - image.y) / image.height).toBeGreaterThan(0.33);
-    expect((box.y + box.height - image.y) / image.height).toBeLessThan(0.525);
+    // Between the deck and bottom chair: near the ribbon, or inward by the die spot on narrow boards at 2J.
+    expect((box.x - image.x) / image.width).toBeGreaterThan(compact ? 0.685 : 0.74);
+    expect((box.x + box.width - image.x) / image.width).toBeLessThan(compact ? 0.76 : 0.835);
+    expect((box.y - image.y) / image.height).toBeGreaterThan(compact ? 0.36 : 0.33);
+    expect((box.y + box.height - image.y) / image.height).toBeLessThan(compact ? 0.55 : 0.525);
   }
 }
 
@@ -383,10 +384,10 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         await expect(betsPanel(player).getByRole('button')).toHaveCount(0);
       };
       const leaders: [string, string][] = [['Camille — Alice', 'AL'], ['Dinah — Jabberwocky', 'JA']];
-      const checkLateSetup = async (player: Page) => {
+      const checkLateSetup = async (player: Page, compact = false) => {
         await checkEmptyHand(player);
         await checkPhaseReference(player);
-        await checkLeaders(player, leaders);
+        await checkLeaders(player, leaders, { compact });
       };
       await Promise.all([checkLateSetup(page), checkLateSetup(guest)]);
       await expect(guest.getByRole('region', { name: 'Journal du salon' })).not.toContainText(guestTitles[0]);
@@ -404,7 +405,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await guest.setViewportSize({ width: 320, height: 720 });
       await guest.goto(link);
       await checkPreparation();
-      await checkLateSetup(guest);
+      await checkLateSetup(guest, true);
 
       await guest.route('**/plateau-principal-fr*.webp', (route) => route.abort());
       await guest.reload();
@@ -415,7 +416,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(preview.locator('.board-blocker')).toHaveCount(0);
       await checkScores(guest, { twoPlayers: true, imageLoaded: false });
       await checkFirstBattle(guest, scoreSlots[0], false);
-      await checkLeaders(guest, leaders, false);
+      await checkLeaders(guest, leaders, { imageLoaded: false });
 
       const newcomer = await otherBrowser.newPage();
       await newcomer.goto(link);
@@ -439,6 +440,65 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       expect(draws).toBe(35 + 2 * 10 + 20 + 21); // Chaque retour agrandit la pioche avant son mélange.
     } finally {
       await otherBrowser.close();
+    }
+  } finally {
+    await server.close();
+  }
+});
+
+test('à 320 px, les Chefs au Bout de Table ne recouvrent pas Premier combat au Comté', async ({ browser, page }) => {
+  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
+    random: () => 0 }); // Le mélange révèle le Jardin ; le dé 1 mène de la Mare au Comté.
+  const listening = once(server.http, 'listening');
+  server.http.listen(0, '127.0.0.1');
+  try {
+    await listening;
+    const address = server.http.address();
+    if (!address || typeof address === 'string') throw new Error('Missing server address');
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto(`http://127.0.0.1:${address.port}`);
+    await page.getByLabel('Votre nom').fill('Camille');
+    await page.getByRole('button', { name: 'Créer le salon' }).click();
+    const link = await page.getByLabel('Lien du salon').inputValue();
+    const guest = await browser.newPage();
+    try {
+      await guest.goto(link);
+      await guest.getByLabel('Votre nom').fill('Dinah');
+      await guest.getByRole('button', { name: 'Rejoindre le salon' }).click();
+      await page.getByRole('button', { name: 'Alice', exact: true }).click();
+      await guest.getByRole('button', { name: 'Jabberwocky', exact: true }).click();
+      await page.getByRole('button', { name: 'Je suis prêt' }).click();
+      await guest.getByRole('button', { name: 'Je suis prêt' }).click();
+      await expect(page.getByText('Dinah est prêt.', { exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Dinah (siège 2)' }).click();
+      await page.getByRole('button', { name: 'Lancer la préparation' }).click();
+
+      const preview = page.getByRole('region', { name: previewTitle });
+      await expect(preview.getByText(reveal, { exact: true })).toBeVisible();
+      await expect(preview.getByText('Premier combat : Comté de la Déraison. Dé Éclat : 1.', { exact: true })).toBeVisible();
+      await checkNoLateSetup(page);
+      await questPanel(page).getByRole('button', { name: 'Garder « Rassembler une ménagerie »' }).click();
+      await questPanel(guest).getByRole('button', { name: 'Garder « La révolution industrielle »' }).click();
+      for (const width of [320, 280]) {
+        await page.setViewportSize({ width, height: 720 });
+        await checkLeaders(page, [['Camille — Alice', 'AL'], ['Dinah — Jabberwocky', 'JA']], { compact: true });
+        await expect(preview.getByRole('img', { name: 'Marqueur Premier combat : Comté de la Déraison' })).toBeVisible();
+
+        const groupBox = await leaderGroup(page).boundingBox();
+        if (!groupBox) throw new Error('Groupe de Chefs non visible');
+        const otherMarkers = preview.locator('.board-first-battle, .board-score-marker, .board-blocker, .board-region-excluded');
+        await expect(otherMarkers).toHaveCount(8); // Premier combat, quatre scores, deux bloqueurs et une Région écartée.
+        for (const marker of await otherMarkers.all()) {
+          await expect(marker).toBeVisible();
+          const box = await marker.boundingBox();
+          if (!box) throw new Error('Repère du plateau non visible');
+          const overlap = groupBox.x < box.x + box.width && box.x < groupBox.x + groupBox.width
+            && groupBox.y < box.y + box.height && box.y < groupBox.y + groupBox.height;
+          expect(overlap, `${width} px : Chefs / ${await marker.textContent()}`).toBe(false);
+        }
+      }
+    } finally {
+      await guest.close();
     }
   } finally {
     await server.close();

@@ -123,14 +123,26 @@ small { color: #decce5; margin-inline-start: .25rem; }
 .board-leader {
   display: grid;
   place-items: center;
-  inline-size: 3.7cqi;
+  inline-size: var(--leader-size, 3.7cqi);
   aspect-ratio: 1;
   border: 1px solid #fff5e9;
   border-radius: 50%;
   background: #1c4034;
   color: #fff5e9;
-  font-size: 1.7cqi;
+  font-size: var(--leader-font-size, 1.7cqi);
   font-weight: 800;
+}
+/* On narrow boards, stack the two 2J badges near the printed die at the end of the table.
+   Keep clear of the deck above, the chairs below and the Premier combat badge at the Comté. */
+@container (max-width: 24rem) {
+  .board-leader-group[data-zone="end-of-table"]:has(> .board-leader:nth-child(2):last-child) {
+    --leader-size: clamp(.8125rem, 4.5cqi, 1.125rem);
+    --leader-font-size: clamp(.48rem, 2.5cqi, .6rem);
+    left: 72%;
+    top: 45.5%;
+    grid-template-columns: 1fr;
+    gap: .25cqi;
+  }
 }
 .initial-leaders { overflow-wrap: anywhere; }
 .board-credit { color: #decce5; font-size: .85rem; }
