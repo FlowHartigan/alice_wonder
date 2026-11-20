@@ -101,7 +101,8 @@ it.each([
   const launched = run(() => 0);
   expect(run(() => 0)).toEqual(launched);
   expect(state.individualResources).toBeNull();
-  expect(launched.game).toEqual(initializeGame(gameId, players.map(({ id }) => id)));
+  expect({ ...launched.game, decisions: [] }).toEqual(initializeGame(gameId, players.map(({ id }) => id)));
+  expect(launched.game?.decisions).toHaveLength(count);
   const allIds: string[] = [];
   for (const [i, seat] of launched.individualResources!.entries()) {
     const { tokenZones, ...holdings } = seat;

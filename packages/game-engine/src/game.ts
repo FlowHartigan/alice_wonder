@@ -1,12 +1,11 @@
 import { gameAction, gameState, MAX_PLAYERS, MIN_PLAYERS } from '@wonderland/shared';
-import type { FirstTeaSetupView, GamePhase, GameState, PrivateGameEvent, PrivatePlayerView, PublicGameView, TeaTableSetupView } from '@wonderland/shared';
+import type { FirstTeaSetupView, GamePhase, GameReceipt, GameState, PrivateGameEvent, PrivatePlayerView, PublicGameView, TeaTableSetupView } from '@wonderland/shared';
 
 /** Server context resolved from an authenticated session, never from the command. */
 export type GameSeat = Readonly<{ gameId: string; playerId: string }>;
 
-type Receipt = { revision: number; event: PrivateGameEvent };
 type GameActionResult =
-  | { ok: true; state: GameState; changed: boolean; receipt: Receipt }
+  | { ok: true; state: GameState; changed: boolean; receipt: GameReceipt }
   | { ok: false; error: 'unauthorized' | 'invalid' | 'conflict' | 'decision-unavailable' | 'wrong-phase' };
 
 export function initializeGame(gameId: string, playerIds: string[]): GameState {

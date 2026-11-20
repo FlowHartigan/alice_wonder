@@ -3,6 +3,7 @@ import { expect, it, vi } from 'vitest';
 import { assignRegionScoreMarkers, createLobby, launchPreparation, resolveTwoPlayerRegionSetup, viewFor } from '@wonderland/game-engine';
 import { REGION_CATALOG } from '@wonderland/shared';
 import { getSetupQuestV1, lobbyState, SETUP_QUEST_CATALOG_V1 } from '@wonderland/shared/lobby-storage';
+import { INITIAL_QUEST_TEXT_V1 } from '../packages/game-engine/src/initial-quest-text-v1.ts';
 
 const { quests } = SETUP_QUEST_CATALOG_V1;
 
@@ -23,6 +24,16 @@ it('fige les 30 identifiants et Régions du relevé web, avec des titres FR seul
     .toEqual(['Peindre les roses', 'Appel aux palourdes', 'Les belles et les bêtes', 'Le château changeur']);
 });
 
+it('associe les deux reformulations et conserve les cinq avertissements du relevé', () => {
+  expect(Object.keys(INITIAL_QUEST_TEXT_V1)).toEqual(quests.map(({ id }) => id));
+  for (const [exploit, objective] of Object.values(INITIAL_QUEST_TEXT_V1)) {
+    expect(exploit).toMatch(/\S/);
+    expect(objective).toMatch(/\S/);
+  }
+  expect(Object.entries(INITIAL_QUEST_TEXT_V1).filter(([, text]) => text[2]).map(([id]) => id))
+    .toEqual(['quest-31019', 'quest-31024', 'quest-31025', 'quest-31028', 'quest-31029']);
+});
+
 it.each([quests[1], quests[5], quests[10], quests[15], quests[20]])('mélange après les marqueurs et retire $exploitRegionId sans réattribution', (wanted) => {
   const host = { id: randomUUID(), name: 'Camille', ready: true, faction: 'alice' as const };
   const guest = { id: randomUUID(), name: 'Dinah', ready: true, faction: 'chapelier-fou' as const };
@@ -38,18 +49,19 @@ it.each([quests[1], quests[5], quests[10], quests[15], quests[20]])('mélange ap
   const reply = launchPreparation(open, host.id, open.revision, randomUUID, random);
   if (!reply.ok) throw new Error(reply.error);
   const state = lobbyState.parse(reply.value);
-  const deck = state.twoPlayerSetup!.questOrder.map(getSetupQuestV1);
   const expected = [...quests];
   [expected[0], expected[index]] = [expected[index], expected[0]];
-  expect(deck).toEqual(expected);
   const scores = state.regionScores!;
   expect(scores).toEqual(assignRegionScoreMarkers({ playerCount: 2 }, () => 0));
-  const result = resolveTwoPlayerRegionSetup({ shuffledQuestDeck: deck, initialRegionScores: scores });
+  const result = resolveTwoPlayerRegionSetup({ shuffledQuestDeck: expected, initialRegionScores: scores });
   const excluded = wanted.exploitRegionId;
   expect(state.firstBattleRoll).toEqual({ dieVersion: 1, result: 2 });
   expect(result.revealedQuest).toBe(wanted);
-  expect(result.excludedQuests).toEqual(deck.filter((quest) => quest.exploitRegionId === excluded));
-  expect(result.remainingQuestDeck).toEqual(deck.filter((quest) => quest.exploitRegionId !== excluded));
+  const { deck, seats, twoPlayerOut } = state.initialQuests!;
+  expect(twoPlayerOut).toEqual({ revealed: wanted.id,
+    removed: expected.filter((quest) => quest !== wanted && quest.exploitRegionId === excluded).map(({ id }) => id) });
+  expect([...seats.flatMap((seat) => seat.type === 'offer' ? seat.cards : [seat.card]), ...deck])
+    .toEqual(expected.filter((quest) => quest.exploitRegionId !== excluded).map(({ id }) => id));
   expect(new Set([...result.excludedQuests, ...result.remainingQuestDeck])).toEqual(new Set(quests));
   expect([...result.regionScores.placements, result.regionScores.excludedPlacement, result.regionScores.storedMarkerId])
     .toEqual([...scores.placements.filter(({ regionId }) => regionId !== excluded),

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { gameState } from './game.ts';
+import type { GameAction, GameReceipt } from './game.ts';
 import { initialRegionScores } from './region-score-markers.ts';
 import type { RegionScoresSetupView } from './region-score-markers.ts';
 import type { RegionId } from './regions.ts';
@@ -47,7 +48,7 @@ export type LaunchBlocker = (typeof launchBlockerCodes)[number];
 export const errorCodes = [
   'invalid', 'room-not-found', 'room-full', 'already-seated', 'unauthorized', 'conflict', 'unavailable',
   'faction-taken', 'faction-required', 'host-required', 'seat-not-found',
-  'room-closed', 'already-launched', ...launchBlockerCodes,
+  'room-closed', 'already-launched', 'decision-unavailable', 'wrong-phase', ...launchBlockerCodes,
 ] as const;
 export type ErrorCode = (typeof errorCodes)[number];
 
@@ -127,21 +128,28 @@ function validPreparation(state: z.infer<typeof lobbyWithGame>) {
   if (!game) return launches.length === 0;
   const last = journal.at(-1);
   return preparationBlockers(state).length === 0
-    && game.phase.type === 'setup' && game.revision === 0 && game.decisions.length === 0 && game.history.length === 0
+    && game.phase.type === 'setup'
     && game.playerIds.length === players.length && players.every(({ id }, i) => game.playerIds[i] === id)
     && launches.length === 1 && last?.type === 'launch-preparation'
     && last.actorId === hostId && last.revision === revision;
 }
 const preparationMessage = 'Sièges ou état de préparation incohérents';
+function untouched(game: z.infer<typeof gameState> | null) {
+  return !game || (game.revision === 0 && game.decisions.length === 0 && game.history.length === 0);
+}
 export const lobbySnapshotV4 = lobbyWithGame.extend({
   version: z.literal(4), regionScores: initialRegionScores.optional(),
 }).refine(factionsAreUnique, uniqueFactionMessage)
-  .refine((state) => validPreparation(state) && (state.game !== null || state.regionScores === undefined), preparationMessage);
+  .refine((state) => validPreparation(state) && untouched(state.game)
+    && (state.game !== null || state.regionScores === undefined), preparationMessage);
 export type LobbySnapshotV4 = z.infer<typeof lobbySnapshotV4>;
 
 export const lobbyWithScores = lobbyWithGame.extend({ regionScores: initialRegionScores.nullable() });
-export function validInitialPreparation(state: z.infer<typeof lobbyWithScores>) {
+export function validPreparationWithScores(state: z.infer<typeof lobbyWithScores>) {
   return factionsAreUnique(state) && validPreparation(state) && (state.game === null) === (state.regionScores === null);
+}
+export function validInitialPreparation(state: z.infer<typeof lobbyWithScores>) {
+  return validPreparationWithScores(state) && untouched(state.game);
 }
 export const lobbySnapshotV5 = lobbyWithScores.extend({
   version: z.literal(5),
@@ -181,6 +189,11 @@ export type FirstBattleSetupView = {
   dieResult: number;
   region: { id: RegionId; name: string };
 };
+export type QuestTextView = { title: string; regionName: string; exploit: string; objective: string; toConfirm?: string };
+export type InitialQuestView = { gameId: string } & (
+  | { type: 'offer'; revision: 0; decisionId: string; cards: (QuestTextView & { optionId: string })[] }
+  | { type: 'kept'; revision: 1; card: QuestTextView }
+);
 export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players' | 'journal'> & {
   you: string;
   canSetReady: boolean;
@@ -194,6 +207,7 @@ export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 
     firstTeaPreview: FirstTeaSetupView;
     individualResources: IndividualResourcesSetupView;
     firstBattle: FirstBattleSetupView;
+    initialQuest: InitialQuestView;
   } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };
@@ -206,7 +220,9 @@ export interface ClientEvents {
   'lobby:join': (input: z.input<typeof joinInput>, ack: Ack<Admission>) => void;
   'lobby:resume': (input: Session, ack: Ack<LobbyView>) => void;
   'lobby:action': (input: LobbyAction, ack: Ack<LobbyView>) => void;
+  'setup-quest:choose': (input: GameAction, ack: Ack<GameReceipt>) => void;
 }
 export interface ServerEvents {
   'lobby:update': (view: LobbyView) => void;
+  'setup-quest:update': (view: InitialQuestView) => void;
 }

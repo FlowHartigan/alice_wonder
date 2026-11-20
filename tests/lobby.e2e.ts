@@ -14,6 +14,8 @@ const teaSummary = 'Table du Thé : 11 chaises ouvertes. Chaises 4J et 5J bloqu�
 const scoreCaption = 'Marqueurs Score de Région — attribution initiale';
 const firstTeaCaption = 'Aperçu — ordre prévu du premier Thé et Éclats de départ';
 const resourcesTitle = 'Dotation individuelle de départ';
+const questTitle = 'Votre Quête initiale (étape J)';
+const questPanel = (page: Page) => page.getByRole('region', { name: questTitle });
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
 const reveal = 'Quête révélée : Remporter le croquet du Jardin. Région hors jeu : Jardin des Fleurs vivantes.';
 const excluded = 'jardin-des-fleurs-vivantes';
@@ -265,6 +267,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         await expect(player.getByRole('table', { name: scoreCaption })).toHaveCount(0);
         await expect(player.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
         await expect(player.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
+        await expect(questPanel(player)).toHaveCount(0);
       }
       await launch.focus();
       await page.keyboard.press('Enter');
@@ -292,10 +295,44 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         }
       }
       await checkPreparation();
-      await page.keyboard.press('Tab');
+      const hostQuest = questPanel(page);
+      const guestQuest = questPanel(guest);
+      for (const panel of [hostQuest, guestQuest]) {
+        await expect(panel.getByRole('article')).toHaveCount(2);
+        await expect(panel.getByText(/^Exploit — /)).toHaveCount(2);
+        await expect(panel.getByText('Objectif', { exact: true })).toHaveCount(2);
+        await expect(panel).toHaveAccessibleDescription(/Textes français non officiels/);
+      }
+      const hostTitles = ['Rassembler une ménagerie', 'Se lier d’amitié avec le forgeron aux oiseaux'];
+      const guestTitles = ['La révolution industrielle', 'Rallier les faibles'];
+      await expect(hostQuest.getByRole('heading', { level: 4 })).toHaveText(hostTitles);
+      await expect(guestQuest.getByRole('heading', { level: 4 })).toHaveText(guestTitles);
+      for (const title of hostTitles) await expect(guest.getByText(title, { exact: true })).toHaveCount(0);
+      for (const title of guestTitles) await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+      for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
       await expect(page.getByRole('table', { name: scoreCaption })).toBeFocused();
       await Promise.all([page.reload(), guest.reload()]);
       await checkPreparation();
+      await expect(hostQuest.getByRole('heading', { level: 4 })).toHaveText(hostTitles);
+      await expect(guestQuest.getByRole('heading', { level: 4 })).toHaveText(guestTitles);
+      const hostChoice = hostQuest.getByRole('button', { name: `Garder « ${hostTitles[1]} »` });
+      await hostChoice.focus();
+      await page.keyboard.press('Enter');
+      await expect(hostQuest.getByRole('status')).toHaveText(/Choix enregistré/);
+      await expect(hostQuest.getByRole('status')).toBeFocused();
+      await expect(hostQuest.getByRole('heading', { level: 4 })).toHaveText([hostTitles[1]]);
+      await expect(guestQuest.getByRole('heading', { level: 4 })).toHaveText(guestTitles);
+      await expect(guestQuest.getByRole('status')).toContainText('Ces deux propositions sont privées');
+      await guestQuest.getByRole('button', { name: `Garder « ${guestTitles[0]} »` }).click();
+      await expect(guestQuest.getByRole('status')).toHaveText(/Choix enregistré/);
+      await expect(guest.getByRole('region', { name: 'Journal du salon' })).not.toContainText(guestTitles[0]);
+      for (const [player, title, absent] of [[page, hostTitles[1], guestTitles[0]], [guest, guestTitles[0], hostTitles[1]]] as const) {
+        await player.reload();
+        await expect(questPanel(player).getByRole('heading', { level: 4 })).toHaveText([title]);
+        await expect(questPanel(player).getByRole('button')).toHaveCount(0);
+        await expect(player.getByText(absent, { exact: true })).toHaveCount(0);
+        await expect(player.getByText(/Le premier Thé n’a pas commencé/)).toBeVisible();
+      }
 
       await guest.close();
       guest = await guestContext.newPage();
@@ -321,9 +358,10 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(newcomer.getByRole('region', { name: 'Préparation de la partie' })).toHaveCount(0);
       await expect(newcomer.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
       await expect(newcomer.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
+      await expect(questPanel(newcomer)).toHaveCount(0);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
       await expect(newcomer.getByText(/Quête révélée|Région hors jeu|Premier combat|Dé Éclat/)).toHaveCount(0);
-      expect(draws).toBe(35 + 2 * 10); // Préparation commune, puis 10 échanges par sac de 11 jetons.
+      expect(draws).toBe(35 + 2 * 10 + 20 + 21); // Chaque retour agrandit la pioche avant son mélange.
     } finally {
       await otherBrowser.close();
     }
@@ -332,10 +370,10 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
   }
 });
 
-for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : aperçus de préparation partagés`, async ({ page }) => {
+for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : préparation commune et Quêtes privées`, async ({ page }) => {
   let draws = 0;
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
-    random: () => ++draws === 6 ? 0.5 : 0 }); // Sans retrait régional, le dé suit les marqueurs, avant les sacs.
+    random: () => ++draws === 35 ? 0.5 : 0 }); // Le dé suit aussi le mélange de Quêtes à 3–5J.
   const clients: Socket<ServerEvents, ClientEvents>[] = [];
   const guests: { session: Session; id: string }[] = [];
   const preparedViews = new Map<string, LobbyView>();
@@ -379,7 +417,7 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await expect(page.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
     await page.getByRole('button', { name: 'Lancer la préparation' }).click();
     await expect(page.getByRole('heading', { name: 'Préparation de la partie' })).toBeFocused();
-    await page.keyboard.press('Tab');
+    for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
     await expect(page.getByRole('table', { name: scoreCaption })).toBeFocused();
     const preview = page.getByRole('region', { name: previewTitle });
     await expect(preview.getByText(`${count + 8} chaises ouvertes.`, { exact: false })).toBeVisible();
@@ -411,11 +449,22 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
       victoryPoints: 0, combat: 0, bagTokenCount: 10, poisonInReserve: resources[i][1],
       activeTokenCount: 0, exhaustedTokenCount: 0, madnessTrackTokenCount: 0,
     }));
+    const ownTitles = await questPanel(page).getByRole('heading', { level: 4 }).allTextContents();
+    expect(ownTitles).toHaveLength(2);
+    const distinctTitles = new Set(ownTitles);
     for (const { id } of guests) {
       const preparation = preparedViews.get(id)?.preparation;
-      expect(preparation).toEqual(shared);
+      expect(preparation).toEqual({ ...shared, initialQuest: preparation?.initialQuest });
       expect(preparation?.individualResources).toStrictEqual(expectedResources);
+      const offer = preparation?.initialQuest;
+      if (offer?.type !== 'offer') throw new Error('Offre privée absente');
+      expect(offer.cards).toHaveLength(2);
+      for (const { title } of offer.cards) {
+        distinctTitles.add(title);
+        await expect(page.getByText(title, { exact: true })).toHaveCount(0);
+      }
     }
+    expect(distinctTitles.size).toBe(2 * count);
 
     clients[1].disconnect();
     await page.reload();
@@ -425,9 +474,36 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     const returned: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
     clients.push(returned);
     const resumed = success(await returned.emitWithAck('lobby:resume', secondGuest.session)).preparation;
-    expect(resumed).toEqual(shared);
+    expect(resumed).toEqual(preparedViews.get(secondGuest.id)?.preparation);
     expect(resumed?.individualResources).toStrictEqual(expectedResources);
-    expect(draws).toBe(6 + count * 9); // Préparation commune, puis 9 échanges par sac de 10 jetons.
+    await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText(ownTitles);
+
+    const guestSockets = clients.slice(0, count - 1).map((socket, i) => i === 1 ? returned : socket);
+    const updates = guestSockets.map((socket) => {
+      const events: string[] = [];
+      socket.onAny((name) => events.push(name));
+      return events;
+    });
+    await Promise.all(guestSockets.map(async (socket, i) => {
+      const offer = preparedViews.get(guests[i].id)?.preparation?.initialQuest;
+      if (offer?.type !== 'offer') throw new Error('Offre privée absente');
+      const receipt = success(await socket.emitWithAck('setup-quest:choose', {
+        type: 'submit-decision', actionId: randomUUID(), expectedRevision: 0,
+        params: { decisionId: offer.decisionId, optionId: offer.cards[0].optionId },
+      }));
+      expect(receipt.revision).toBe(1);
+    }));
+    await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText(ownTitles);
+    await questPanel(page).getByRole('button', { name: `Garder « ${ownTitles[0]} »` }).click();
+    await expect(questPanel(page).getByRole('status')).toContainText('Choix enregistré');
+    for (const [i, socket] of guestSockets.entries()) {
+      expect(success(await socket.emitWithAck('lobby:resume', guests[i].session)).preparation?.initialQuest.type).toBe('kept');
+      expect(updates[i]).toEqual(['setup-quest:update']);
+    }
+    await page.reload();
+    await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText([ownTitles[0]]);
+    await expect(page.getByText(/Le premier Thé n’a pas commencé/)).toBeVisible();
+    expect(draws).toBe(35 + count * 9 + Array.from({ length: count }, (_, i) => 30 - 2 * count + i).reduce((a, b) => a + b));
   } finally {
     for (const client of clients) client.disconnect();
     await server.close();
