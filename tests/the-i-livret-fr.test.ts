@@ -15,7 +15,11 @@ type Definition = {
 };
 type Vue = { page: number; repere: string; visuel?: string };
 type Motif = { id: string; preuve: string; correspondance: string; definition: string; illustrations: Vue[] };
-type Observation = Omit<Motif, "definition"> & { definition?: string; observation: string };
+type Observation = Omit<Motif, "definition"> & {
+  definitionComparee?: string;
+  groupesVisibles: Partial<Record<"commun" | "haut" | "bas" | "siDeAccepte", string[]>>;
+  observation: string;
+};
 
 const inventaire = lire("livret-fr.json");
 const motifs: Motif[] = inventaire.motifsComplets;
@@ -43,7 +47,8 @@ describe("Thé I — inventaire des illustrations du livret FR", () => {
       expect(observation.id).toMatch(/^fr-[a-z0-9-]+$/);
       expect(observation.illustrations.length).toBeGreaterThan(0);
       expect(observation).not.toHaveProperty("occurrences");
-      if (observation.definition !== undefined) expect(definitions.has(observation.definition)).toBe(true);
+      const definition = "definition" in observation ? observation.definition : observation.definitionComparee;
+      if (definition !== undefined) expect(definitions.has(definition)).toBe(true);
       for (const vue of observation.illustrations) {
         expect(visuels.sources[inventaire.source].pagesReleve).toContain(vue.page);
         expect(vue.repere.trim()).not.toBe("");
@@ -76,12 +81,23 @@ describe("Thé I — inventaire des illustrations du livret FR", () => {
       }
     }
     for (const partiel of partiels) {
-      expect(partiel.correspondance).toBe("partielle");
+      expect(["partielle", "absente", "indeterminee"]).toContain(partiel.correspondance);
+      expect(partiel).not.toHaveProperty("definition");
+      expect(partiel.definitionComparee !== undefined).toBe(partiel.correspondance !== "indeterminee");
       expect(["recto-partiel", "lecture-incertaine", "scene-masquee"]).toContain(partiel.preuve);
       expect(partiel.observation.trim()).not.toBe("");
+      expect(Object.keys(partiel.groupesVisibles).length).toBeGreaterThan(0);
+      for (const [cle, effets] of Object.entries(partiel.groupesVisibles)) {
+        expect(["commun", "haut", "bas", "siDeAccepte"]).toContain(cle);
+        expect(effets.length).toBeGreaterThan(0);
+        expect(effets.every((effet) => typeof effet === "string" && effet.trim() !== "")).toBe(true);
+      }
     }
     expect(partiels.find((p) => p.id === "fr-p11-flamant-quete")).toMatchObject({
-      preuve: "recto-partiel", definition: "the-i-29408",
+      preuve: "recto-partiel", definitionComparee: "the-i-29408",
+    });
+    expect(partiels.find((p) => p.id === "fr-p11-alice-de-coin")).toMatchObject({
+      correspondance: "absente", definitionComparee: "the-i-29424",
     });
     expect(motifs.map((m) => m.definition)).not.toContain("the-i-29408");
     expect(definitions.get("the-i-29420")).toMatchObject({
@@ -101,7 +117,10 @@ describe("Thé I — inventaire des illustrations du livret FR", () => {
       siDeAccepte: ["Jet du dé Éclat", "Gain : 1 Allié faible au choix"],
     });
     expect(motifs.map((m) => m.definition)).not.toContain(l2c10.definition);
-    expect(partiels.find((p) => p.definition === l2c10.definition)?.correspondance).toBe("partielle");
+    expect(partiels.find((p) => p.definitionComparee === l2c10.definition)).toMatchObject({
+      correspondance: "partielle",
+      groupesVisibles: { siDeAccepte: ["Jet du dé Éclat", "Affectation supplémentaire (nombre incertain)"] },
+    });
     expect(definitions.get(l2c10.definition)).toMatchObject({
       commun: ["Affectation : 2 unités", "Déblocage : 1 capacité de Faction au choix"],
       siDeAccepte: ["Jet du dé Éclat", "Affectation supplémentaire : 2 unités"],
