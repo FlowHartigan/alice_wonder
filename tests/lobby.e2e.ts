@@ -5,7 +5,7 @@ import { expect, firefox, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
-import { FACTION_IDS } from '@wonderland/shared';
+import { FACTION_IDS, FACTION_NAMES } from '@wonderland/shared';
 import type { ClientEvents, LobbyView, Reply, ServerEvents, Session } from '@wonderland/shared';
 import { makeServer } from '../apps/server/src/server.ts';
 
@@ -16,6 +16,7 @@ const firstTeaCaption = 'Aperçu — ordre prévu du premier Thé et Éclats de 
 const resourcesTitle = 'Dotation individuelle de départ';
 const questTitle = 'Votre Quête initiale (étape J)';
 const questPanel = (page: Page) => page.getByRole('region', { name: questTitle });
+const betsPanel = (page: Page) => page.getByRole('region', { name: 'Vos cartes Pari' });
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
 const reveal = 'Quête révélée : Remporter le croquet du Jardin. Région hors jeu : Jardin des Fleurs vivantes.';
 const excluded = 'jardin-des-fleurs-vivantes';
@@ -297,6 +298,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await checkPreparation();
       const hostQuest = questPanel(page);
       const guestQuest = questPanel(guest);
+      for (const player of [page, guest]) await expect(betsPanel(player)).toHaveCount(0);
       for (const panel of [hostQuest, guestQuest]) {
         await expect(panel.getByRole('article')).toHaveCount(2);
         await expect(panel.getByText(/^Exploit — /)).toHaveCount(2);
@@ -323,8 +325,15 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(hostQuest.getByRole('heading', { level: 4 })).toHaveText([hostTitles[1]]);
       await expect(guestQuest.getByRole('heading', { level: 4 })).toHaveText(guestTitles);
       await expect(guestQuest.getByRole('status')).toContainText('Ces deux propositions sont privées');
+      for (const player of [page, guest]) await expect(betsPanel(player)).toHaveCount(0);
       await guestQuest.getByRole('button', { name: `Garder « ${guestTitles[0]} »` }).click();
       await expect(guestQuest.getByRole('status')).toHaveText(/Choix enregistré/);
+      const checkEmptyHand = async (player: Page) => {
+        await expect(betsPanel(player).getByText('Aucune carte Pari à deux joueurs.')).toBeVisible();
+        await expect(betsPanel(player).getByRole('listitem')).toHaveCount(0);
+        await expect(betsPanel(player).getByRole('button')).toHaveCount(0);
+      };
+      await Promise.all([checkEmptyHand(page), checkEmptyHand(guest)]);
       await expect(guest.getByRole('region', { name: 'Journal du salon' })).not.toContainText(guestTitles[0]);
       for (const [player, title, absent] of [[page, hostTitles[1], guestTitles[0]], [guest, guestTitles[0], hostTitles[1]]] as const) {
         await player.reload();
@@ -332,6 +341,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         await expect(questPanel(player).getByRole('button')).toHaveCount(0);
         await expect(player.getByText(absent, { exact: true })).toHaveCount(0);
         await expect(player.getByText(/Le premier Thé n’a pas commencé/)).toBeVisible();
+        await checkEmptyHand(player);
       }
 
       await guest.close();
@@ -359,6 +369,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(newcomer.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
       await expect(newcomer.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
       await expect(questPanel(newcomer)).toHaveCount(0);
+      await expect(betsPanel(newcomer)).toHaveCount(0);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
       await expect(newcomer.getByText(/Quête révélée|Région hors jeu|Premier combat|Dé Éclat/)).toHaveCount(0);
       expect(draws).toBe(35 + 2 * 10 + 20 + 21); // Chaque retour agrandit la pioche avant son mélange.
@@ -370,13 +381,16 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
   }
 });
 
-for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : préparation commune et Quêtes privées`, async ({ page }) => {
+for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : Quêtes et mains de Pari privées`, async ({ page }) => {
   let draws = 0;
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
     random: () => ++draws === 35 ? 0.5 : 0 }); // Le dé suit aussi le mélange de Quêtes à 3–5J.
   const clients: Socket<ServerEvents, ClientEvents>[] = [];
   const guests: { session: Session; id: string }[] = [];
   const preparedViews = new Map<string, LobbyView>();
+  function recordPreparation(view: LobbyView) {
+    if (view.preparation) preparedViews.set(view.you, view);
+  }
   function success<T>(reply: Reply<T>): T {
     if (!reply.ok) throw new Error(reply.error);
     return reply.value;
@@ -398,9 +412,7 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     for (const [i, faction] of FACTION_IDS.slice(1, count).entries()) {
       const guest: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
       clients.push(guest);
-      guest.on('lobby:update', (view) => {
-        if (view.preparation) preparedViews.set(view.you, view);
-      });
+      guest.on('lobby:update', recordPreparation);
       const { view, session } = success(await guest.emitWithAck('lobby:join', { code, name: `Invité ${i + 1}` }));
       guests.push({ session, id: view.you });
       const picked = success(await guest.emitWithAck('lobby:action', {
@@ -440,6 +452,8 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     expect(shared?.firstTeaPreview).toEqual([...guests.slice(1).map(({ id }) => id), hostId, firstGuest.id]
       .map((playerId, i) => ({ playerId, turn: i + 1, plannedShards: shards[i] })));
     expect(shared?.twoPlayerSetup).toBeNull();
+    expect(shared?.initialBets).toBeNull();
+    await expect(betsPanel(page)).toHaveCount(0);
     expect(shared?.firstBattle).toEqual({ dieResult: 2, region: { id: garden.id, name: garden.name } });
     // Liste exacte : les zones de jetons ne livrent que des nombres, même au propriétaire du sac.
     const expectedResources = [hostId, ...guests.map(({ id }) => id)].map((playerId, i) => ({
@@ -473,6 +487,7 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await checkFirstBattle(page, garden);
     const returned: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
     clients.push(returned);
+    returned.on('lobby:update', recordPreparation);
     const resumed = success(await returned.emitWithAck('lobby:resume', secondGuest.session)).preparation;
     expect(resumed).toEqual(preparedViews.get(secondGuest.id)?.preparation);
     expect(resumed?.individualResources).toStrictEqual(expectedResources);
@@ -494,14 +509,24 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
       expect(receipt.revision).toBe(1);
     }));
     await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText(ownTitles);
+    await expect(betsPanel(page)).toHaveCount(0);
     await questPanel(page).getByRole('button', { name: `Garder « ${ownTitles[0]} »` }).click();
     await expect(questPanel(page).getByRole('status')).toContainText('Choix enregistré');
+    const checkHand = async () => {
+      await expect(betsPanel(page).getByRole('listitem')).toHaveText(FACTION_IDS.slice(1, count).map((id) => FACTION_NAMES[id]));
+      await expect(betsPanel(page).getByRole('button')).toHaveCount(0);
+    };
+    await checkHand();
     for (const [i, socket] of guestSockets.entries()) {
-      expect(success(await socket.emitWithAck('lobby:resume', guests[i].session)).preparation?.initialQuest.type).toBe('kept');
-      expect(updates[i]).toEqual(['setup-quest:update']);
+      const view = success(await socket.emitWithAck('lobby:resume', guests[i].session));
+      expect(view).toEqual(preparedViews.get(guests[i].id));
+      expect(view.preparation?.initialQuest.type).toBe('kept');
+      expect(view.preparation?.initialBets).toEqual(FACTION_IDS.slice(0, count).filter((_, j) => j !== i + 1));
+      expect(updates[i]).toEqual(['setup-quest:update', 'lobby:update']);
     }
     await page.reload();
     await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText([ownTitles[0]]);
+    await checkHand();
     await expect(page.getByText(/Le premier Thé n’a pas commencé/)).toBeVisible();
     expect(draws).toBe(35 + count * 9 + Array.from({ length: count }, (_, i) => 30 - 2 * count + i).reduce((a, b) => a + b));
   } finally {

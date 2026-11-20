@@ -49,7 +49,9 @@ export function makeServer(options: { database: string; webRoot?: string; public
     for (const socketId of io.of('/').adapter.rooms.get(channel(state.code)) ?? []) {
       const target = io.of('/').sockets.get(socketId);
       const seat = target?.data.seat;
-      if (seat?.code === state.code) target?.emit('lobby:update', viewFor(state, seat.playerId));
+      if (seat?.code === state.code && (!state.game || state.game.playerIds.includes(seat.playerId))) {
+        target?.emit('lobby:update', viewFor(state, seat.playerId));
+      }
     }
   }
 
@@ -98,12 +100,13 @@ export function makeServer(options: { database: string; webRoot?: string; public
       if (!seat) return { ok: false, error: 'unauthorized' };
       const result = store.chooseQuest(seat, action);
       if (!result.ok) return result;
-      const { update, receipt } = result.value;
-      if (update) {
+      const { publication, receipt } = result.value;
+      if (publication?.type === 'bets-ready') publish(publication.state);
+      else if (publication?.type === 'quest') {
         for (const socketId of io.of('/').adapter.rooms.get(channel(seat.code)) ?? []) {
           const target = io.of('/').sockets.get(socketId);
           const recipient = target?.data.seat;
-          if (target && recipient?.code === seat.code && recipient.playerId === seat.playerId) target.emit('setup-quest:update', update);
+          if (target && recipient?.code === seat.code && recipient.playerId === seat.playerId) target.emit('setup-quest:update', publication.view);
         }
       }
       return { ok: true, value: receipt };
