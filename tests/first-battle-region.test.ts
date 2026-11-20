@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { resolveFirstBattleRegion } from '@wonderland/game-engine';
+import { describe, expect, it, vi } from 'vitest';
+import { resolveFirstBattleRegion, rollFirstBattleDie } from '@wonderland/game-engine';
 import type { FirstBattleRegionInput } from '@wonderland/game-engine';
 import { REGION_CATALOG } from '@wonderland/shared';
 
@@ -8,6 +8,20 @@ const foret = 'foret-de-tulgey';
 const jardin = 'jardin-des-fleurs-vivantes';
 const mare = 'mare-de-larmes';
 const comte = 'comte-de-la-deraison';
+
+describe('Dé Éclat de Premier combat — arbitrage web v1 (#69)', () => {
+  it.each([1, 1, 1, 2, 2, 3].map((result, index) => ({ result, index })))('indice $index → $result, avec un seul appel', ({ index, result }) => {
+    const random = vi.fn(() => index / 6);
+    expect(rollFirstBattleDie(random)).toEqual({ dieVersion: 1, result });
+    expect(random).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([-1, 1, NaN, Infinity])('refuse un échantillon hors de [0, 1) : %s', (sample) => {
+    const random = vi.fn(() => sample);
+    expect(() => rollFirstBattleDie(random)).toThrow(RangeError);
+    expect(random).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('Premier combat (WW-SETUP-004 / WW-COUNT-001 / WW-MAP-001)', () => {
   // Step counts exercise the calculation, not the faces of the die.

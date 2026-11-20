@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import type { RegionScoresSetupView, TeaTableSetupView, TwoPlayerSetupView } from '@wonderland/shared';
+import type { FirstBattleSetupView, RegionScoresSetupView, TeaTableSetupView, TwoPlayerSetupView } from '@wonderland/shared';
 import board from '../../../assets/official/plateau-principal-fr.webp';
 
 const blockerLabels = new Intl.ListFormat('fr', { type: 'conjunction' });
 
-export function BoardPreview({ teaTable: { openChairs, activeBlockers }, regionScores, twoPlayerSetup }: {
+export function BoardPreview({ teaTable: { openChairs, activeBlockers }, regionScores, twoPlayerSetup, firstBattle }: {
   teaTable: TeaTableSetupView;
   regionScores: RegionScoresSetupView;
   twoPlayerSetup: TwoPlayerSetupView | null;
+  firstBattle: FirstBattleSetupView;
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const blocked = activeBlockers.length === 0 ? 'Aucune chaise bloquée.'
@@ -21,9 +22,12 @@ export function BoardPreview({ teaTable: { openChairs, activeBlockers }, regionS
       <strong>Quête révélée :</strong> {twoPlayerSetup.revealedQuestTitle}.{' '}
       <strong>Région hors jeu :</strong> {twoPlayerSetup.excludedRegion.name}.
     </p>}
+    <p id="first-battle-summary">
+      <strong>Premier combat :</strong> {firstBattle.region.name}. <strong>Dé Éclat :</strong> {firstBattle.dieResult}.
+    </p>
     <div className="board-preview-image">
       <img src={board} width={2400} height={1637} alt="Plateau central officiel en français, avec la table du Thé au centre."
-        aria-describedby={twoPlayerSetup ? 'tea-table-summary region-removal-summary' : 'tea-table-summary'}
+        aria-describedby={`tea-table-summary${twoPlayerSetup ? ' region-removal-summary' : ''} first-battle-summary`}
         draggable={false} onLoad={() => setImageLoaded(true)} />
       {imageLoaded && activeBlockers.map((id) => <span key={id} className="board-blocker" data-chair={id} aria-hidden="true">{id}</span>)}
       {imageLoaded && regionScores.placements.map(({ regionId, pointsByRound: pv }) => (
@@ -33,6 +37,8 @@ export function BoardPreview({ teaTable: { openChairs, activeBlockers }, regionS
       ))}
       {imageLoaded && twoPlayerSetup && <span className="board-region-excluded"
         data-region={twoPlayerSetup.excludedRegion.id} aria-hidden="true">Hors jeu</span>}
+      {imageLoaded && <span className="board-first-battle" data-region={firstBattle.region.id} role="img"
+        aria-label={`Marqueur Premier combat : ${firstBattle.region.name}`}>1er combat</span>}
     </div>
     <p className="board-credit">Plateau : Druid City Games · édition française : Lucky Duck Games.</p>
     <table className="board-scores" tabIndex={0}>

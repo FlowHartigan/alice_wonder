@@ -1,5 +1,16 @@
 import { REGION_CATALOG, getActiveRegionCircuit } from '@wonderland/shared';
 import type { RegionId } from '@wonderland/shared';
+import { FIRST_BATTLE_DIE_VERSION } from '@wonderland/shared/lobby-storage';
+import type { FirstBattleRoll } from '@wonderland/shared/lobby-storage';
+import { randomIndex } from './game.ts';
+import type { RandomSource } from './game.ts';
+
+// #69 — arbitrage web v1, pas une vérification du matériel FR ni un erratum.
+const SHARD_DIE_FACES_V1 = [1, 1, 1, 2, 2, 3] as const;
+
+export function rollFirstBattleDie(random: RandomSource): FirstBattleRoll {
+  return { dieVersion: FIRST_BATTLE_DIE_VERSION, result: SHARD_DIE_FACES_V1[randomIndex(SHARD_DIE_FACES_V1.length, random)] };
+}
 
 export type FirstBattleRegionInput = Readonly<
   | { playerCount: 2; dieResult: number; excludedRegionId: RegionId }

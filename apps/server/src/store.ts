@@ -1,10 +1,10 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { createLobby, joinLobby, applyLobbyAction, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, migrateLobbyV5 } from '@wonderland/game-engine';
+import { createLobby, joinLobby, applyLobbyAction, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, migrateLobbyV5, migrateLobbyV6 } from '@wonderland/game-engine';
 import type { RandomSource } from '@wonderland/game-engine';
 import { lobbySnapshotV5, lobbySnapshotV4, lobbyStateV1, lobbyStateV2, lobbyStateV3 } from '@wonderland/shared';
 import type { LobbyAction, Reply, Session } from '@wonderland/shared';
-import { lobbyState } from '@wonderland/shared/lobby-storage';
+import { lobbySnapshotV6, lobbyState } from '@wonderland/shared/lobby-storage';
 import type { LobbyState } from '@wonderland/shared/lobby-storage';
 
 export type Seat = { code: string; playerId: string };
@@ -23,8 +23,9 @@ const migration1 = `
   PRAGMA user_version = 1;
 `;
 
-// Uniform over 32 bits; shuffle consumes fractions in [0, 1).
-const randomFraction: RandomSource = () => randomInt(2 ** 32) / 2 ** 32;
+// A multiple of six gives each face exactly the same number of discrete samples.
+const randomRange = 6 * 2 ** 29;
+const randomFraction: RandomSource = () => randomInt(randomRange) / randomRange;
 
 export function openStore(path: string, random: RandomSource = randomFraction) {
   const db = new DatabaseSync(path);
@@ -41,7 +42,7 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
     }
   }
 
-  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5 | 6) {
+  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5 | 6 | 7) {
     const rows = db.prepare('SELECT code, snapshot FROM lobbies').all();
     for (const row of rows) {
       const raw: unknown = JSON.parse(String(row.snapshot));
@@ -64,10 +65,14 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       } else if (version === 5) {
         const old = lobbySnapshotV5.parse(raw);
         if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v5');
-        save(migrateLobbyV5(old, random));
+        writeSnapshot(lobbySnapshotV6.parse(migrateLobbyV5(old, random)));
+      } else if (version === 6) {
+        const old = lobbySnapshotV6.parse(raw);
+        if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v6');
+        save(migrateLobbyV6(old, random));
       } else {
         const snapshot = lobbyState.parse(raw);
-        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v6');
+        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v7');
       }
     }
   }
@@ -75,7 +80,7 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
   try {
     transaction(() => {
       const version = db.prepare('PRAGMA user_version').get()?.user_version;
-      if (version !== 0 && version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6) {
+      if (version !== 0 && version !== 1 && version !== 2 && version !== 3 && version !== 4 && version !== 5 && version !== 6 && version !== 7) {
         throw new Error('Version de base non prise en charge');
       }
       if (version === 0) db.exec(migration1);
@@ -84,10 +89,11 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       if (version <= 3) restoreSnapshots(3);
       if (version <= 4) restoreSnapshots(4);
       if (version <= 5) restoreSnapshots(5);
-      if (version === 6) restoreSnapshots(6);
+      if (version === 7) restoreSnapshots(7);
       else {
+        restoreSnapshots(6);
         // Preserve sessions and successful action fingerprints through all steps.
-        db.exec('PRAGMA user_version = 6');
+        db.exec('PRAGMA user_version = 7');
       }
     });
   } catch (error) {

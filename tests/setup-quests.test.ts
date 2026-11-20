@@ -32,6 +32,7 @@ it.each([quests[1], quests[5], quests[10], quests[15], quests[20]])('mélange ap
   const random = vi.fn(() => {
     const step = call++;
     // The score shuffle rotates left, then the quest shuffle swaps just the chosen quest to the top.
+    if (step === 34) return 0.5; // Only the final draw is for the die (index 3 → 2).
     return step < 5 || step === 5 + 29 - index ? 0 : 0.999;
   });
   const reply = launchPreparation(open, host.id, open.revision, randomUUID, random);
@@ -45,6 +46,7 @@ it.each([quests[1], quests[5], quests[10], quests[15], quests[20]])('mélange ap
   expect(scores).toEqual(assignRegionScoreMarkers({ playerCount: 2 }, () => 0));
   const result = resolveTwoPlayerRegionSetup({ shuffledQuestDeck: deck, initialRegionScores: scores });
   const excluded = wanted.exploitRegionId;
+  expect(state.firstBattleRoll).toEqual({ dieVersion: 1, result: 2 });
   expect(result.revealedQuest).toBe(wanted);
   expect(result.excludedQuests).toEqual(deck.filter((quest) => quest.exploitRegionId === excluded));
   expect(result.remainingQuestDeck).toEqual(deck.filter((quest) => quest.exploitRegionId !== excluded));
@@ -56,6 +58,11 @@ it.each([quests[1], quests[5], quests[10], quests[15], quests[20]])('mélange ap
     const preparation = viewFor(state, player.id).preparation!;
     expect(preparation.twoPlayerSetup).toEqual({ revealedQuestTitle: wanted.title, excludedRegion: { id: excluded, name: REGION_CATALOG.names[excluded] } });
     expect(preparation.regionScores.placements.map(({ regionId }) => regionId)).toEqual(REGION_CATALOG.clockwise.filter((id) => id !== excluded));
+    expect(preparation.firstBattle.dieResult).toBe(2);
+    expect(preparation.firstBattle.region.id).not.toBe(excluded);
+    if (excluded === 'donjon-rouge') {
+      expect(preparation.firstBattle.region).toEqual({ id: 'mare-de-larmes', name: 'Mare de Larmes' });
+    }
   }
-  expect(random).toHaveBeenCalledTimes(34);
+  expect(random).toHaveBeenCalledTimes(35);
 });
