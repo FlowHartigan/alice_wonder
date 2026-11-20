@@ -1,10 +1,10 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { createLobby, joinLobby, applyLobbyAction, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, migrateLobbyV5, migrateLobbyV6, migrateLobbyV7 } from '@wonderland/game-engine';
+import { createLobby, joinLobby, applyLobbyAction, chooseInitialQuest, initialQuestFor, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, migrateLobbyV5, migrateLobbyV6, migrateLobbyV7, migrateLobbyV8 } from '@wonderland/game-engine';
 import type { RandomSource } from '@wonderland/game-engine';
 import { lobbySnapshotV5, lobbySnapshotV4, lobbyStateV1, lobbyStateV2, lobbyStateV3 } from '@wonderland/shared';
-import type { LobbyAction, Reply, Session } from '@wonderland/shared';
-import { lobbySnapshotV6, lobbySnapshotV7, lobbyState } from '@wonderland/shared/lobby-storage';
+import type { GameAction, GameReceipt, InitialQuestView, LobbyAction, Reply, Session } from '@wonderland/shared';
+import { lobbySnapshotV6, lobbySnapshotV7, lobbySnapshotV8, lobbyState } from '@wonderland/shared/lobby-storage';
 import type { LobbyState } from '@wonderland/shared/lobby-storage';
 
 export type Seat = { code: string; playerId: string };
@@ -42,7 +42,7 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
     }
   }
 
-  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8) {
+  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) {
     const rows = db.prepare('SELECT code, snapshot FROM lobbies').all();
     for (const row of rows) {
       const raw: unknown = JSON.parse(String(row.snapshot));
@@ -73,18 +73,23 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       } else if (version === 7) {
         const old = lobbySnapshotV7.parse(raw);
         if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v7');
-        save(migrateLobbyV7(old, random));
+        writeSnapshot(lobbySnapshotV8.parse(migrateLobbyV7(old, random)));
+      } else if (version === 8) {
+        const old = lobbySnapshotV8.parse(raw);
+        if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v8');
+        save(migrateLobbyV8(old, random));
       } else {
         const snapshot = lobbyState.parse(raw);
-        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v8');
+        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v9');
       }
     }
   }
 
   try {
+    db.exec('PRAGMA busy_timeout = 5000');
     transaction(() => {
       const version = db.prepare('PRAGMA user_version').get()?.user_version;
-      if (typeof version !== 'number' || !Number.isInteger(version) || version < 0 || version > 8) {
+      if (typeof version !== 'number' || !Number.isInteger(version) || version < 0 || version > 9) {
         throw new Error('Version de base non prise en charge');
       }
       if (version === 0) db.exec(migration1);
@@ -94,11 +99,12 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       if (version <= 4) restoreSnapshots(4);
       if (version <= 5) restoreSnapshots(5);
       if (version <= 6) restoreSnapshots(6);
-      if (version === 8) restoreSnapshots(8);
+      if (version === 9) restoreSnapshots(9);
       else {
-        restoreSnapshots(7);
+        if (version <= 7) restoreSnapshots(7);
+        restoreSnapshots(8);
         // Preserve sessions and successful action fingerprints through all steps.
-        db.exec('PRAGMA user_version = 8');
+        db.exec('PRAGMA user_version = 9');
       }
     });
   } catch (error) {
@@ -156,6 +162,18 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       const state = load(session.code);
       const playerId = String(row.player_id);
       if (state?.players.some(({ id }) => id === playerId)) return { state, playerId };
+    },
+    chooseQuest(seat: Seat, action: GameAction): Reply<{ receipt: GameReceipt; update?: InitialQuestView }> {
+      return transaction(() => {
+        const state = load(seat.code);
+        if (!state) return { ok: false, error: 'room-not-found' };
+        const result = chooseInitialQuest(state, seat.playerId, action, random);
+        if (!result.ok) return result;
+        const { receipt } = result;
+        if (!result.changed) return { ok: true, value: { receipt } };
+        save(result.state); // Movement and accepted private intent/receipt commit together.
+        return { ok: true, value: { receipt, update: initialQuestFor(result.state, seat.playerId) } };
+      });
     },
     action(seat: Seat, action: LobbyAction): Reply<{ state: LobbyState; changed: boolean }> {
       return transaction(() => {

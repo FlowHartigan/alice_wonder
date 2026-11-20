@@ -1,11 +1,14 @@
 import { z } from 'zod';
-import { lobbyWithScores, validInitialPreparation } from './index.ts';
+import { lobbyWithScores, validInitialPreparation, validPreparationWithScores } from './index.ts';
+import { initialQuestsSnapshot, matchesInitialQuests } from './initial-quests.ts';
 import { initialResourcesSnapshot, matchesStartingSeat, startingSeatResources } from './initial-resources.ts';
 import { twoPlayerSetupSnapshot } from './setup-quests-v1.ts';
 
 export { STARTING_TOKEN_TYPES, startingSeatResources } from './initial-resources.ts';
 export type { InitialResourcesSnapshot } from './initial-resources.ts';
 export * from './setup-quests-v1.ts';
+export { questOptionId } from './initial-quests.ts';
+export type { InitialQuestsSnapshot } from './initial-quests.ts';
 
 // Server-only entry point: the public client contract does not import internal setup data.
 export const FIRST_BATTLE_DIE_VERSION = 1;
@@ -33,12 +36,33 @@ const lobbyWithFirstBattle = lobbyWithRegionalSetup.safeExtend({
 export const lobbySnapshotV7 = lobbyWithFirstBattle.safeExtend({ version: z.literal(7) });
 export type LobbySnapshotV7 = z.infer<typeof lobbySnapshotV7>;
 
-export const lobbyState = lobbyWithFirstBattle.safeExtend({
+const resourcesError = { message: 'Dotation initiale incohérente avec les sièges ou les zones', path: ['individualResources'] };
+export const lobbySnapshotV8 = lobbyWithFirstBattle.safeExtend({
   version: z.literal(8), individualResources: initialResourcesSnapshot.nullable(),
-}).refine(({ game, players, individualResources }) => {
+}).refine(matchesResources, resourcesError);
+export type LobbySnapshotV8 = z.infer<typeof lobbySnapshotV8>;
+
+function matchesResources({ game, players, individualResources }: Pick<LobbySnapshotV7, 'game' | 'players'> & {
+  individualResources: z.infer<typeof initialResourcesSnapshot> | null;
+}) {
   if (!game) return individualResources === null;
   return individualResources !== null && individualResources.length === players.length
     && players.every(({ id, faction }, i) => faction !== null
       && matchesStartingSeat(individualResources[i], startingSeatResources(id, faction, players.length)));
-}, { message: 'Dotation initiale incohérente avec les sièges ou les zones', path: ['individualResources'] });
+}
+function matchesFirstPlayer({ firstPlayerId, players }: Pick<LobbySnapshotV8, 'firstPlayerId' | 'players'>) {
+  return firstPlayerId === null || players.some(({ id }) => id === firstPlayerId);
+}
+
+export const lobbyState = lobbyWithScores.extend({
+  version: z.literal(9), firstBattleRoll: firstBattleRoll.nullable(),
+  individualResources: initialResourcesSnapshot.nullable(), initialQuests: initialQuestsSnapshot.nullable(),
+}).refine(validPreparationWithScores, 'Sièges ou état de préparation incohérents')
+  .refine(matchesFirstPlayer, { message: 'Le premier joueur doit avoir un siège dans le salon', path: ['firstPlayerId'] })
+  .refine(({ firstBattleRoll, game }) => (firstBattleRoll === null) === (game === null), {
+    message: 'Lancer de Premier combat requis uniquement en préparation lancée', path: ['firstBattleRoll'],
+  }).refine(matchesResources, resourcesError)
+  .refine(({ game, initialQuests }) => matchesInitialQuests(game, initialQuests), {
+    message: 'Zones ou décisions de Quêtes initiales incohérentes', path: ['initialQuests'],
+  });
 export type LobbyState = z.infer<typeof lobbyState>;

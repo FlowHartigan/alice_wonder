@@ -4,8 +4,9 @@ import { createRoot } from 'react-dom/client';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { credentials, FACTION_NAMES, MAX_PLAYERS, MIN_PLAYERS, roomCode } from '@wonderland/shared';
-import type { ClientEvents, ErrorCode, IndividualResourcesSetupView, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
+import type { ClientEvents, ErrorCode, IndividualResourcesSetupView, InitialQuestView, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
 import { BoardPreview } from './BoardPreview.tsx';
+import { InitialQuest } from './InitialQuest.tsx';
 import './styles.css';
 
 const messages: Record<ErrorCode, string> = {
@@ -22,6 +23,8 @@ const messages: Record<ErrorCode, string> = {
   'seat-not-found': 'Ce siège n’est pas dans le salon. Choisissez un siège présent.',
   'room-closed': 'La préparation a commencé. Le salon est fermé aux nouvelles admissions et sa configuration est figée.',
   'already-launched': 'La préparation a déjà été lancée.',
+  'decision-unavailable': 'Ce choix de Quête n’est plus disponible.',
+  'wrong-phase': 'Ce choix est réservé à la préparation de la partie.',
   'player-count': `Il faut entre ${MIN_PLAYERS} et ${MAX_PLAYERS} joueurs pour lancer la préparation.`,
   'factions-incomplete': 'Chaque joueur doit choisir une faction différente.',
   'players-not-ready': 'Tous les joueurs doivent confirmer qu’ils sont prêts.',
@@ -138,7 +141,15 @@ function App() {
   const preparing = Boolean(preparation);
 
   function receive(next: LobbyView) {
-    setView((previous) => previous && previous.code === next.code && previous.revision > next.revision ? previous : next);
+    setView((previous) => {
+      if (previous?.code !== next.code) return next;
+      if (previous.revision > next.revision) return previous;
+      const current = previous.preparation?.initialQuest;
+      if (current && next.preparation?.gameId === current.gameId && current.revision > next.preparation.initialQuest.revision) {
+        return { ...next, preparation: { ...next.preparation, initialQuest: current } };
+      }
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -175,16 +186,23 @@ function App() {
     const onUpdate = (next: LobbyView) => {
       if (session.current?.code === next.code) receive(next);
     };
+    const onQuestUpdate = (next: InitialQuestView) => setView((previous) => {
+      const current = previous?.preparation;
+      if (!previous || !current || current.gameId !== next.gameId || current.initialQuest.revision >= next.revision) return previous;
+      return { ...previous, preparation: { ...current, initialQuest: next } };
+    });
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onDisconnect);
     socket.on('lobby:update', onUpdate);
+    socket.on('setup-quest:update', onQuestUpdate);
     socket.connect();
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onDisconnect);
       socket.off('lobby:update', onUpdate);
+      socket.off('setup-quest:update', onQuestUpdate);
       socket.disconnect();
     };
   }, []);
@@ -230,6 +248,18 @@ function App() {
       });
       if (!reply.ok) return setError(reply.error === 'invalid' ? 'Cette action n’est pas reconnue par le serveur.' : messages[reply.error]);
       receive(reply.value);
+    });
+  }
+
+  function chooseQuest(optionId: string) {
+    const quest = preparation?.initialQuest;
+    if (quest?.type !== 'offer') return;
+    void request(async () => {
+      const reply = await socket.emitWithAck('setup-quest:choose', {
+        type: 'submit-decision', actionId: actionId(), expectedRevision: quest.revision,
+        params: { decisionId: quest.decisionId, optionId },
+      });
+      if (!reply.ok) setError(reply.error === 'invalid' ? 'Cette Quête ne fait pas partie de vos propositions.' : messages[reply.error]);
     });
   }
 
@@ -282,6 +312,7 @@ function App() {
             <td>{plannedShards}</td>
           </tr>)}</tbody>
         </table>
+        <InitialQuest quest={preparation.initialQuest} disabled={disabled} choose={chooseQuest} />
         <IndividualResources players={view.players} resources={preparation.individualResources} />
         <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores}
           twoPlayerSetup={preparation.twoPlayerSetup} firstBattle={preparation.firstBattle} />

@@ -1,17 +1,18 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
 import type { LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, RegionId, Reply } from '@wonderland/shared';
 import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
-import type { LobbySnapshotV6, LobbySnapshotV7, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
+import type { LobbySnapshotV6, LobbySnapshotV7, LobbySnapshotV8, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
 import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-region.ts';
-import { firstTeaForSetup, initializeGame, shuffle, teaTableForSetup } from './game.ts';
+import { firstTeaForSetup, initializeGame, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
 import { distributeInitialResources, projectInitialResources } from './initial-resources.ts';
 import { assignRegionScoreMarkers } from './region-score-markers.ts';
-import { resolveTwoPlayerRegionSetup } from './two-player-region-setup.ts';
+import { dealInitialQuests, initialQuestFor, questSupply, shuffleSetupQuestIds } from './initial-quests.ts';
 
 export * from './battle.ts';
 export * from './first-battle-region.ts';
 export * from './game.ts';
+export * from './initial-quests.ts';
 export * from './region-score-markers.ts';
 export * from './two-player-region-setup.ts';
 
@@ -19,8 +20,8 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 8, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null, twoPlayerSetup: null,
-    firstBattleRoll: null, individualResources: null,
+    version: 9, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null,
+    firstBattleRoll: null, individualResources: null, initialQuests: null,
     players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
   };
@@ -66,17 +67,14 @@ export function migrateLobbyV4(old: LobbySnapshotV4, random: RandomSource): Lobb
   return { ...old, version: 5, regionScores };
 }
 
-function drawTwoPlayerSetup(regionScores: NonNullable<LobbyState['regionScores']>, random: RandomSource): TwoPlayerSetupSnapshot {
-  const shuffledQuestDeck = shuffle(SETUP_QUEST_CATALOG_V1.quests, random);
-  // Apply WW-COUNT-001 before committing. The order encodes the reveal (head) and all derived results.
-  resolveTwoPlayerRegionSetup({ shuffledQuestDeck, initialRegionScores: regionScores });
-  return { catalogVersion: SETUP_QUEST_CATALOG_V1.version, questOrder: shuffledQuestDeck.map(({ id }) => id) };
+function drawLegacyTwoPlayerSetup(random: RandomSource): TwoPlayerSetupSnapshot {
+  return { catalogVersion: SETUP_QUEST_CATALOG_V1.version, questOrder: shuffleSetupQuestIds(random) };
 }
 
 /** Receives a validated v5 snapshot, with a complete Score inventory if already launched. */
 export function migrateLobbyV5(old: LobbySnapshotV5, random: RandomSource): LobbySnapshotV6 {
   const twoPlayerSetup = old.game?.playerIds.length === 2 && old.regionScores
-    ? drawTwoPlayerSetup(old.regionScores, random) : null;
+    ? drawLegacyTwoPlayerSetup(random) : null;
   return normalizeFirstPlayer({ ...old, version: 6, twoPlayerSetup });
 }
 
@@ -86,8 +84,16 @@ export function migrateLobbyV6(old: LobbySnapshotV6, random: RandomSource): Lobb
 }
 
 /** Receives a validated v7 snapshot (any launched game is still in untouched initial setup). */
-export function migrateLobbyV7(old: LobbySnapshotV7, random: RandomSource): LobbyState {
+export function migrateLobbyV7(old: LobbySnapshotV7, random: RandomSource): LobbySnapshotV8 {
   return { ...old, version: 8, individualResources: old.game ? distributeInitialResources(old.players, random) : null };
+}
+
+/** v8 has no J state yet. At 2J the old order already fixes the reveal and remaining deck. */
+export function migrateLobbyV8({ twoPlayerSetup, ...old }: LobbySnapshotV8, random: RandomSource): LobbyState {
+  const next: LobbyState = { ...old, version: 9, initialQuests: null };
+  if (!old.game || !old.regionScores) return next;
+  const order = twoPlayerSetup?.questOrder ?? shuffleSetupQuestIds(random);
+  return { ...next, ...dealInitialQuests(old.game, questSupply(order, old.game.playerIds.length, old.regionScores)) };
 }
 
 /** For legacy open salons or after a future removal from the roster. */
@@ -120,10 +126,12 @@ export function launchPreparation(
   if (blocker) return { ok: false, error: blocker };
   const game = initializeGame(newGameId(), state.players.map(({ id }) => id));
   const regionScores = drawRegionScores(game.playerIds.length, random);
-  const twoPlayerSetup = game.playerIds.length === 2 ? drawTwoPlayerSetup(regionScores, random) : null;
+  // WW-SETUP-004 steps 10–11: one quest shuffle, then (at 2J) exclusion, then the die.
+  const supply = questSupply(shuffleSetupQuestIds(random), game.playerIds.length, regionScores);
   const firstBattleRoll = rollFirstBattleDie(random);
   const individualResources = distributeInitialResources(state.players, random);
-  return { ok: true, value: advance({ ...state, game, regionScores, twoPlayerSetup, firstBattleRoll, individualResources },
+  const quests = dealInitialQuests(game, supply);
+  return { ok: true, value: advance({ ...state, ...quests, regionScores, firstBattleRoll, individualResources },
     { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
 }
 
@@ -170,29 +178,31 @@ function firstBattleForSetup(playerCount: number, dieResult: number, excludedReg
 
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
   const hostInLobby = !state.game && playerId === state.hostId;
-  const { game, regionScores, twoPlayerSetup, firstBattleRoll, individualResources } = state;
+  const { game, regionScores, initialQuests, firstBattleRoll, individualResources } = state;
   const admittedGame = game?.playerIds.includes(playerId) ? game : null;
   const firstTeaPreview = admittedGame ? firstTeaForSetup(admittedGame, state.firstPlayerId) : null;
-  const regionalSetup = firstTeaPreview && regionScores && twoPlayerSetup ? resolveTwoPlayerRegionSetup({
-    shuffledQuestDeck: twoPlayerSetup.questOrder.map(getSetupQuestV1), initialRegionScores: regionScores,
-  }) : null;
+  const initialQuest = admittedGame ? initialQuestFor(state, playerId) : undefined;
+  const revealed = initialQuests?.twoPlayerOut ? getSetupQuestV1(initialQuests.twoPlayerOut.revealed) : null;
+  const excluded = revealed?.exploitRegionId;
   return {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
     firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
     launch: hostInLobby ? { blockers: preparationBlockers(state) } : null,
-    preparation: admittedGame && regionScores && firstTeaPreview && individualResources && firstBattleRoll ? {
+    preparation: admittedGame && regionScores && firstTeaPreview && individualResources && firstBattleRoll && initialQuest ? {
       gameId: admittedGame.gameId,
       teaTable: teaTableForSetup(admittedGame),
       firstTeaPreview,
       individualResources: projectInitialResources(individualResources),
-      firstBattle: firstBattleForSetup(admittedGame.playerIds.length, firstBattleRoll.result, regionalSetup?.excludedRegionId),
-      twoPlayerSetup: regionalSetup ? {
-        revealedQuestTitle: regionalSetup.revealedQuest.title,
-        excludedRegion: { id: regionalSetup.excludedRegionId, name: REGION_CATALOG.names[regionalSetup.excludedRegionId] },
+      initialQuest,
+      firstBattle: firstBattleForSetup(admittedGame.playerIds.length, firstBattleRoll.result, excluded),
+      twoPlayerSetup: revealed && excluded ? {
+        revealedQuestTitle: revealed.title,
+        excludedRegion: { id: excluded, name: REGION_CATALOG.names[excluded] },
       } : null,
       regionScores: {
         placements: REGION_CATALOG.clockwise.flatMap((regionId) => {
-          const placement = (regionalSetup?.regionScores ?? regionScores).placements.find((p) => p.regionId === regionId);
+          if (regionId === excluded) return [];
+          const placement = regionScores.placements.find((p) => p.regionId === regionId);
           if (!placement) return [];
           const { markerId } = placement;
           const { pointsByRound } = REGION_SCORE_MARKER_CATALOG.markers.find(({ id }) => id === markerId)!;

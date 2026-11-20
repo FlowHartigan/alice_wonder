@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import type { ZodType } from 'zod';
 import { viewFor } from '@wonderland/game-engine';
 import type { RandomSource } from '@wonderland/game-engine';
-import { createInput, joinInput, credentials, lobbyAction } from '@wonderland/shared';
+import { createInput, joinInput, credentials, gameAction, lobbyAction } from '@wonderland/shared';
 import type { ClientEvents, Reply, ServerEvents } from '@wonderland/shared';
 import type { LobbyState } from '@wonderland/shared/lobby-storage';
 import { openStore } from './store.ts';
@@ -92,6 +92,21 @@ export function makeServer(options: { database: string; webRoot?: string; public
       if (!result.ok) return result;
       if (result.value.changed) publish(result.value.state);
       return { ok: true, value: viewFor(result.value.state, seat.playerId) };
+    }));
+    socket.on('setup-quest:choose', handler(gameAction, (action) => {
+      const seat = socket.data.seat;
+      if (!seat) return { ok: false, error: 'unauthorized' };
+      const result = store.chooseQuest(seat, action);
+      if (!result.ok) return result;
+      const { update, receipt } = result.value;
+      if (update) {
+        for (const socketId of io.of('/').adapter.rooms.get(channel(seat.code)) ?? []) {
+          const target = io.of('/').sockets.get(socketId);
+          const recipient = target?.data.seat;
+          if (target && recipient?.code === seat.code && recipient.playerId === seat.playerId) target.emit('setup-quest:update', update);
+        }
+      }
+      return { ok: true, value: receipt };
     }));
   });
 

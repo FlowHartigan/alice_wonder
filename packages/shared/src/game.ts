@@ -58,6 +58,7 @@ export type GameState = z.infer<typeof gameState>;
 export type GamePhase = z.infer<typeof gamePhase>;
 export type GameAction = z.infer<typeof gameAction>;
 export type PrivateGameEvent = z.infer<typeof privateEvent>;
+export type GameReceipt = { revision: number; event: PrivateGameEvent };
 
 // Intentionally not derived from the snapshot: adding a stored field never publishes it.
 export type PublicGameView = { gameId: string; phase: GamePhase; playerIds: string[] };

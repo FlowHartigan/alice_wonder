@@ -5,7 +5,7 @@ function quest<Id extends string>(id: Id, exploitRegionId: RegionId, title: stri
   return Object.freeze({ id, exploitRegionId, title });
 }
 
-// WW-SETUP-004 / WW-COUNT-001 — paquet web réservé au retrait initial à 2J (#65).
+// WW-SETUP-004 / WW-COUNT-001 / WW-SETUP-003 J — retrait 2J (#65) et choix initial (#14).
 // Relevé TTS EN 2886627193 : titres maison sauf 31000, 31016, 31018 et 31022 (livret FR).
 // Les IDs d’application sont stables et privés ; ne pas réaffecter les entrées de cette version.
 export const SETUP_QUEST_CATALOG_V1 = Object.freeze({
@@ -45,7 +45,8 @@ export const SETUP_QUEST_CATALOG_V1 = Object.freeze({
 });
 
 const byId = new Map(SETUP_QUEST_CATALOG_V1.quests.map((entry) => [entry.id, entry] as const));
-const questId = z.enum(SETUP_QUEST_CATALOG_V1.quests.map(({ id }) => id));
+export const questId = z.enum(SETUP_QUEST_CATALOG_V1.quests.map(({ id }) => id));
+export type QuestId = z.infer<typeof questId>;
 
 export const twoPlayerSetupSnapshot = z.strictObject({
   catalogVersion: z.literal(SETUP_QUEST_CATALOG_V1.version),
