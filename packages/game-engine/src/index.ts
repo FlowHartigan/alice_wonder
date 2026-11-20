@@ -1,7 +1,8 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
-import type { LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, Reply } from '@wonderland/shared';
+import type { LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, RegionId, Reply } from '@wonderland/shared';
 import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
-import type { LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
+import type { LobbySnapshotV6, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
+import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-region.ts';
 import { firstTeaForSetup, initializeGame, shuffle, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
 import { assignRegionScoreMarkers } from './region-score-markers.ts';
@@ -17,7 +18,7 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 6, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null, twoPlayerSetup: null,
+    version: 7, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null, twoPlayerSetup: null, firstBattleRoll: null,
     players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
   };
@@ -71,16 +72,23 @@ function drawTwoPlayerSetup(regionScores: NonNullable<LobbyState['regionScores']
 }
 
 /** Receives a validated v5 snapshot, with a complete Score inventory if already launched. */
-export function migrateLobbyV5(old: LobbySnapshotV5, random: RandomSource): LobbyState {
+export function migrateLobbyV5(old: LobbySnapshotV5, random: RandomSource): LobbySnapshotV6 {
   const twoPlayerSetup = old.game?.playerIds.length === 2 && old.regionScores
     ? drawTwoPlayerSetup(old.regionScores, random) : null;
   return normalizeFirstPlayer({ ...old, version: 6, twoPlayerSetup });
 }
 
+/** Receives a validated v6 snapshot; no earlier setup data is redrawn. */
+export function migrateLobbyV6(old: LobbySnapshotV6, random: RandomSource): LobbyState {
+  return { ...old, version: 7, firstBattleRoll: old.game ? rollFirstBattleDie(random) : null };
+}
+
 /** For legacy open salons or after a future removal from the roster. */
-export function normalizeFirstPlayer(state: LobbyState): LobbyState {
+export function normalizeFirstPlayer(state: LobbyState): LobbyState;
+export function normalizeFirstPlayer(state: LobbySnapshotV6): LobbySnapshotV6;
+export function normalizeFirstPlayer(state: LobbyState | LobbySnapshotV6): LobbyState | LobbySnapshotV6 {
   if (state.game || state.firstPlayerId === null || state.players.some(({ id }) => id === state.firstPlayerId)) return state;
-  return advance({ ...state, firstPlayerId: null }, { revision: state.revision + 1, type: 'first-player-cleared' });
+  return { ...state, firstPlayerId: null, ...appendEvent(state.journal, { revision: state.revision + 1, type: 'first-player-cleared' }) };
 }
 
 export function joinLobby(state: LobbyState, player: NewPlayer): Reply<LobbyState> {
@@ -106,7 +114,8 @@ export function launchPreparation(
   const game = initializeGame(newGameId(), state.players.map(({ id }) => id));
   const regionScores = drawRegionScores(game.playerIds.length, random);
   const twoPlayerSetup = game.playerIds.length === 2 ? drawTwoPlayerSetup(regionScores, random) : null;
-  return { ok: true, value: advance({ ...state, game, regionScores, twoPlayerSetup }, { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
+  const firstBattleRoll = rollFirstBattleDie(random);
+  return { ok: true, value: advance({ ...state, game, regionScores, twoPlayerSetup, firstBattleRoll }, { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
 }
 
 export function applyLobbyAction(state: LobbyState, actorId: string, action: LobbyEdit): Reply<LobbyState> {
@@ -141,9 +150,18 @@ export function applyLobbyAction(state: LobbyState, actorId: string, action: Lob
   return { ok: true, value: { ...next, players: state.players.map((p) => p.id === actorId ? { ...p, ready: action.ready } : p) } };
 }
 
+function firstBattleForSetup(playerCount: number, dieResult: number, excludedRegionId?: RegionId) {
+  const id = playerCount === 2 && excludedRegionId !== undefined
+    ? resolveFirstBattleRegion({ playerCount, dieResult, excludedRegionId })
+    : (playerCount === 3 || playerCount === 4 || playerCount === 5) && excludedRegionId === undefined
+      ? resolveFirstBattleRegion({ playerCount, dieResult }) : null;
+  if (id === null) throw new Error('Préparation incohérente pour Premier combat');
+  return { dieResult, region: { id, name: REGION_CATALOG.names[id] } };
+}
+
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
   const hostInLobby = !state.game && playerId === state.hostId;
-  const { game, regionScores, twoPlayerSetup } = state;
+  const { game, regionScores, twoPlayerSetup, firstBattleRoll } = state;
   const firstTeaPreview = game?.playerIds.includes(playerId) ? firstTeaForSetup(game, state.firstPlayerId) : null;
   const regionalSetup = firstTeaPreview && regionScores && twoPlayerSetup ? resolveTwoPlayerRegionSetup({
     shuffledQuestDeck: twoPlayerSetup.questOrder.map(getSetupQuestV1), initialRegionScores: regionScores,
@@ -152,10 +170,11 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
     firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
     launch: hostInLobby ? { blockers: preparationBlockers(state) } : null,
-    preparation: game && regionScores && firstTeaPreview ? {
+    preparation: game && regionScores && firstTeaPreview && firstBattleRoll ? {
       gameId: game.gameId,
       teaTable: teaTableForSetup(game),
       firstTeaPreview,
+      firstBattle: firstBattleForSetup(game.playerIds.length, firstBattleRoll.result, regionalSetup?.excludedRegionId),
       twoPlayerSetup: regionalSetup ? {
         revealedQuestTitle: regionalSetup.revealedQuest.title,
         excludedRegion: { id: regionalSetup.excludedRegionId, name: REGION_CATALOG.names[regionalSetup.excludedRegionId] },

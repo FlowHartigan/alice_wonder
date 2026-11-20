@@ -123,12 +123,16 @@ export function privatePlayerView(state: GameState, seat: GameSeat | undefined):
 /** Server-provided uniform values in [0, 1); the engine owns no implicit random source. */
 export type RandomSource = () => number;
 
+export function randomIndex(length: number, random: RandomSource): number {
+  const value = random();
+  if (!Number.isFinite(value) || value < 0 || value >= 1) throw new RangeError('Source aléatoire hors de [0, 1)');
+  return Math.floor(value * length);
+}
+
 export function shuffle<T>(items: readonly T[], random: RandomSource): T[] {
   const shuffled = [...items];
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const value = random();
-    if (!Number.isFinite(value) || value < 0 || value >= 1) throw new RangeError('Source aléatoire hors de [0, 1)');
-    const j = Math.floor(value * (i + 1));
+    const j = randomIndex(i + 1, random);
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   return shuffled;

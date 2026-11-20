@@ -16,6 +16,7 @@ const firstTeaCaption = 'Aperçu — ordre prévu du premier Thé et Éclats de 
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
 const reveal = 'Quête révélée : Remporter le croquet du Jardin. Région hors jeu : Jardin des Fleurs vivantes.';
 const excluded = 'jardin-des-fleurs-vivantes';
+const boardName = /Plateau central officiel en français/;
 const scoreSlots = [
   { id: 'donjon-rouge', name: 'Donjon rouge', pv: ['2', '6', '12'], x: 0.874, y: 0.671 },
   { id: 'foret-de-tulgey', name: 'Forêt de Tulgey', pv: ['2', '8', '10'], x: 0.569, y: 0.892 },
@@ -23,6 +24,32 @@ const scoreSlots = [
   { id: 'mare-de-larmes', name: 'Mare de Larmes', pv: ['4', '8', '8'], x: 0.113, y: 0.516 },
   { id: 'comte-de-la-deraison', name: 'Comté de la Déraison', pv: ['6', '6', '8'], x: 0.886, y: 0.558 },
 ];
+
+function firstBattleSummary(regionName: string) {
+  return `Premier combat : ${regionName}. Dé Éclat : 2.`;
+}
+
+async function checkFirstBattle(player: Page, region: typeof scoreSlots[number], imageLoaded = true) {
+  const preview = player.getByRole('region', { name: previewTitle });
+  await expect(preview.getByText(firstBattleSummary(region.name), { exact: true })).toBeVisible();
+  const marker = preview.locator('.board-first-battle');
+  if (!imageLoaded) {
+    await expect(marker).toHaveCount(0);
+    return;
+  }
+  await expect(marker).toHaveCount(1);
+  await expect(preview.getByRole('img', { name: `Marqueur Premier combat : ${region.name}` })).toBeVisible();
+  await expect(marker).toHaveAttribute('data-region', region.id);
+  await expect(marker).toHaveText('1er combat');
+  await expect(marker).toHaveCSS('pointer-events', 'none');
+  await expect(preview.locator(`.board-region-excluded[data-region="${region.id}"]`)).toHaveCount(0);
+  const image = await preview.getByRole('img', { name: boardName }).boundingBox();
+  const score = await preview.locator(`.board-score-marker[data-region="${region.id}"]`).boundingBox();
+  const box = await marker.boundingBox();
+  if (!image || !score || !box) throw new Error('Repère de Premier combat introuvable');
+  expect((box.x + box.width / 2 - image.x) / image.width).toBeCloseTo(region.x, 3);
+  expect(box.y >= score.y + score.height || box.y + box.height <= score.y).toBe(true);
+}
 
 async function checkFirstTea(player: Page, expected: [string, string][]) {
   const table = player.getByRole('table', { name: firstTeaCaption });
@@ -48,7 +75,8 @@ async function checkScores(player: Page, { twoPlayers, imageLoaded = true }: { t
   const badge = preview.locator('.board-region-excluded');
   if (twoPlayers) {
     await expect(preview.getByText(reveal, { exact: true })).toBeVisible();
-    await expect(preview.getByRole('img')).toHaveAccessibleDescription(`${teaSummary} ${reveal}`);
+    await expect(preview.getByRole('img', { name: boardName }))
+      .toHaveAccessibleDescription(`${teaSummary} ${reveal} ${firstBattleSummary(scoreSlots[0].name)}`);
     if (imageLoaded) {
       await expect(badge).toBeVisible();
       await expect(badge).toHaveText('Hors jeu');
@@ -61,7 +89,7 @@ async function checkScores(player: Page, { twoPlayers, imageLoaded = true }: { t
   }
   const markers = preview.locator('.board-score-marker');
   await expect(markers).toHaveCount(imageLoaded ? activeSlots.length : 0);
-  const image = await preview.getByRole('img').boundingBox();
+  const image = await preview.getByRole('img', { name: boardName }).boundingBox();
   if (!image) throw new Error('Aperçu introuvable');
   for (const { id, name, pv, x, y } of activeSlots) {
     const row = table.getByRole('row').filter({ has: player.getByRole('rowheader', { name, exact: true }) });
@@ -80,9 +108,9 @@ async function checkScores(player: Page, { twoPlayers, imageLoaded = true }: { t
 
 async function checkBoard(player: Page) {
   const preview = player.getByRole('region', { name: previewTitle });
-  const image = preview.getByRole('img', { name: /Plateau central officiel en français/ });
+  const image = preview.getByRole('img', { name: boardName });
   await expect(preview.getByText(teaSummary, { exact: true })).toBeVisible();
-  await expect(image).toHaveAccessibleDescription(`${teaSummary} ${reveal}`);
+  await expect(image).toHaveAccessibleDescription(`${teaSummary} ${reveal} ${firstBattleSummary(scoreSlots[0].name)}`);
   await expect(image).toHaveAttribute('src', /plateau-principal-fr.*\.webp$/);
   await expect.poll(() => image.evaluate((element: HTMLImageElement) =>
     [element.complete, element.naturalWidth, element.naturalHeight])).toEqual([true, 2400, 1637]);
@@ -106,7 +134,9 @@ async function checkBoard(player: Page) {
 }
 
 test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la retrouvent', async ({ page }) => {
-  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)), random: () => 0 });
+  let draws = 0;
+  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
+    random: () => ++draws === 35 ? 0.5 : 0 });
   const listening = once(server.http, 'listening');
   server.http.listen(0, '127.0.0.1');
   try {
@@ -229,6 +259,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
           await checkFirstTea(player, [['Dinah (siège 2)', '2'], ['Camille (siège 1)', '1']]);
           await checkBoard(player);
           await checkScores(player, { twoPlayers: true });
+          await checkFirstBattle(player, scoreSlots[0]);
         }
       }
       await checkPreparation();
@@ -251,6 +282,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(preview.getByText(teaSummary, { exact: true })).toBeVisible();
       await expect(preview.locator('.board-blocker')).toHaveCount(0);
       await checkScores(guest, { twoPlayers: true, imageLoaded: false });
+      await checkFirstBattle(guest, scoreSlots[0], false);
 
       const newcomer = await otherBrowser.newPage();
       await newcomer.goto(link);
@@ -260,7 +292,8 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(newcomer.getByRole('region', { name: 'Préparation de la partie' })).toHaveCount(0);
       await expect(newcomer.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
-      await expect(newcomer.getByText(/Quête révélée|Région hors jeu/)).toHaveCount(0);
+      await expect(newcomer.getByText(/Quête révélée|Région hors jeu|Premier combat|Dé Éclat/)).toHaveCount(0);
+      expect(draws).toBe(35);
     } finally {
       await otherBrowser.close();
     }
@@ -269,8 +302,10 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
   }
 });
 
-for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : ordre partagé, cinq marqueurs, pas de Quête`, async ({ page }) => {
-  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)), random: () => 0 });
+for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : Premier combat partagé, cinq scores, pas de retrait`, async ({ page }) => {
+  let draws = 0;
+  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
+    random: () => ++draws === 6 ? 0.5 : 0 });
   const clients: Socket<ServerEvents, ClientEvents>[] = [];
   const guests: { session: Session; id: string }[] = [];
   const preparedViews = new Map<string, LobbyView>();
@@ -319,6 +354,8 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await expect(preview.getByText(`${count + 8} chaises ouvertes.`, { exact: false })).toBeVisible();
     await expect(preview.locator('.board-blocker')).toHaveCount(5 - count);
     await checkScores(page, { twoPlayers: false });
+    const garden = scoreSlots[2];
+    await checkFirstBattle(page, garden);
     const labels = [...guests.slice(1).map((_, i) => `Invité ${i + 2} (siège ${i + 3})`), 'Camille (siège 1)', 'Invité 1 (siège 2)'];
     const shards = count === 3 ? [3, 2, 1] : count === 4 ? [3, 2, 2, 1] : [3, 2, 2, 1, 0];
     const expected: [string, string][] = labels.map((label, i) => [label, String(shards[i])]);
@@ -329,14 +366,17 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     expect(shared?.firstTeaPreview).toEqual([...guests.slice(1).map(({ id }) => id), hostId, firstGuest.id]
       .map((playerId, i) => ({ playerId, turn: i + 1, plannedShards: shards[i] })));
     expect(shared?.twoPlayerSetup).toBeNull();
+    expect(shared?.firstBattle).toEqual({ dieResult: 2, region: { id: garden.id, name: garden.name } });
     for (const { id } of guests) expect(preparedViews.get(id)?.preparation).toEqual(shared);
 
     clients[1].disconnect();
     await page.reload();
     await checkFirstTea(page, expected);
+    await checkFirstBattle(page, garden);
     const returned: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
     clients.push(returned);
     expect(success(await returned.emitWithAck('lobby:resume', secondGuest.session)).preparation).toEqual(shared);
+    expect(draws).toBe(6);
   } finally {
     for (const client of clients) client.disconnect();
     await server.close();

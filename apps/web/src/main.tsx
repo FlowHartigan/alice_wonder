@@ -247,7 +247,8 @@ function App() {
             <td>{plannedShards}</td>
           </tr>)}</tbody>
         </table>
-        <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores} twoPlayerSetup={preparation.twoPlayerSetup} />
+        <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores}
+          twoPlayerSetup={preparation.twoPlayerSetup} firstBattle={preparation.firstBattle} />
       </section> : <>
       <section className="panel" aria-labelledby="players">
         <div className="section-title"><h2 id="players">Joueurs</h2><span>{view.players.length} / {MAX_PLAYERS}</span></div>

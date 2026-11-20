@@ -157,6 +157,10 @@ export type TwoPlayerSetupView = {
   revealedQuestTitle: string;
   excludedRegion: { id: RegionId; name: string };
 };
+export type FirstBattleSetupView = {
+  dieResult: number;
+  region: { id: RegionId; name: string };
+};
 export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players' | 'journal'> & {
   you: string;
   canSetReady: boolean;
@@ -168,6 +172,7 @@ export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 
     regionScores: RegionScoresSetupView;
     twoPlayerSetup: TwoPlayerSetupView | null;
     firstTeaPreview: FirstTeaSetupView;
+    firstBattle: FirstBattleSetupView;
   } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };
