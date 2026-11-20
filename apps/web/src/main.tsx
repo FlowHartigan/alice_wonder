@@ -320,6 +320,9 @@ function App() {
         <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores}
           twoPlayerSetup={preparation.twoPlayerSetup} firstBattle={preparation.firstBattle}
           initialLeaders={preparation.initialLeaders} players={view.players} />
+        <div aria-live="polite">
+          {preparation.initialLeaders !== null && <p>Les Éclats de départ ne sont pas encore crédités : ils seront attribués quand le plateau commun sera prêt.</p>}
+        </div>
       </section> : <>
       <section className="panel" aria-labelledby="players">
         <div className="section-title"><h2 id="players">Joueurs</h2><span>{view.players.length} / {MAX_PLAYERS}</span></div>

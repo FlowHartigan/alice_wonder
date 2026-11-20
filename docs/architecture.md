@@ -55,8 +55,14 @@ Le store relit le snapshot sous `BEGIN IMMEDIATE`, valide l'intention et écrit 
 
 ### Aperçu du premier Thé et des Éclats de départ (#63)
 
-- `firstTeaForSetup` dérive les rangs et Éclats prévus de `GameState.playerIds` en `setup` et de `firstPlayerId` dans la configuration figée (`WW-SETUP-005`). L'ordre d'admission n'est pas modifié : la rotation en partant de J1 est propre à la vue. Ni faction ni présence réseau n'est une entrée du calcul.
+- `firstTeaForSetup` dérive les rangs et Éclats prévus de `GameState.playerIds` en `setup` et de `firstPlayerId` dans la configuration figée (`WW-SETUP-005`). L'aperçu est présenté dans l'ordre horaire depuis J1, sans modifier l'ordre d'admission. Ni faction ni présence réseau n'est une entrée du calcul.
 - `viewFor` expose `preparation.firstTeaPreview` seulement à un siège de la partie, dans la vue de salon déjà réservée aux sessions admises. C'est une liste publique pour ces sièges : identifiant, rang et Éclats prévus ; React affiche ces valeurs et retrouve les noms dans la liste publique des sièges. Pas d'action, de tirage, d'événement, de changement de schéma ni d'écriture pour cet aperçu, y compris à la reprise et au rejeu. Il ne modifie ni l'ordre de la mise en place ni les ressources et ne désigne aucun joueur actif.
+
+### Transfert N isolé et message d'attente (#81)
+
+- `transferStartingShards` est une transition pure prévue pour le serveur, sans appel dans le salon. L'entrée `pending` fournit la phase, les sièges figés, J1 et deux confirmations explicites : `stepsJThroughMComplete` et `commonSetupReady`. Un refus renvoie `null`. En `setup`, le calcul réutilise `firstTeaForSetup` et son unique tableau pour produire un état `resolved` immuable, avec les banques et soldes avant/après par dénomination. La banque de départ (30 pièces de 1, 10 de 5) est fixe. Réappliquer la transition au résultat acquis le restitue tel quel, sans nouveau transfert.
+- React ajoute une phrase en lecture seule après `BoardPreview`, dans une région `aria-live="polite"` présente dès l'affichage de la préparation. Elle dépend de `initialLeaders`, qui indique la disponibilité de la projection M, **pas** que la préparation commune est prête. Aucun solde acquis, nouveau signal serveur, action, route, changement de phase, de contrat réseau, de diffusion ou de snapshot v9.
+- L'intégration autoritaire, effective et persistée appartient à [#80](https://github.com/FlowHartigan/alice_wonder/issues/80), bloquée par la préparation commune [#12](https://github.com/FlowHartigan/alice_wonder/issues/12) ; [#13](https://github.com/FlowHartigan/alice_wonder/issues/13) reste ouverte.
 
 ### Dotation individuelle de départ (#73)
 
