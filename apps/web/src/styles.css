@@ -51,6 +51,8 @@ button:disabled { opacity: .55; cursor: default; }
 small { color: #decce5; margin-inline-start: .25rem; }
 .code { font-family: ui-monospace, monospace; font-size: 1.5rem; letter-spacing: .14em; color: #f1c774; }
 .feedback { padding: .55rem .8rem; background: #392942; border-inline-start: 3px solid #f1c774; }
+.setup-reference { margin-block: .75rem; }
+.setup-reference a { color: #f1c774; }
 .first-tea-preview { width: 100%; border-collapse: collapse; margin-bottom: 1.25rem; }
 .first-tea-preview caption { text-align: start; font-weight: 700; padding-bottom: .35rem; }
 .first-tea-preview th, .first-tea-preview td { text-align: start; padding: .35rem .25rem; border-bottom: 1px solid #614971; }
@@ -107,6 +109,30 @@ small { color: #decce5; margin-inline-start: .25rem; }
 /* Beside the score of the same region, away from the nearest score on either edge. */
 .board-first-battle { transform: translate(-50%, calc(-150% - 2px)); background: #1e3447; color: #fff; border-color: #fff; }
 .board-first-battle:is([data-region="donjon-rouge"], [data-region="jardin-des-fleurs-vivantes"]) { transform: translate(-50%, calc(50% + 2px)); }
+/* Beside the printed Bout de Table ribbon on the FR WebP, clear of the deck and chairs. */
+.board-leader-group[data-zone="end-of-table"] {
+  position: absolute;
+  left: 79%;
+  top: 42.5%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .35cqi;
+  pointer-events: none;
+}
+.board-leader {
+  display: grid;
+  place-items: center;
+  inline-size: 3.7cqi;
+  aspect-ratio: 1;
+  border: 1px solid #fff5e9;
+  border-radius: 50%;
+  background: #1c4034;
+  color: #fff5e9;
+  font-size: 1.7cqi;
+  font-weight: 800;
+}
+.initial-leaders { overflow-wrap: anywhere; }
 .board-credit { color: #decce5; font-size: .85rem; }
 .board-scores { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .board-scores caption { text-align: start; font-weight: 700; padding-bottom: .35rem; }

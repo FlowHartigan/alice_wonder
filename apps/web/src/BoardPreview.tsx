@@ -1,14 +1,20 @@
 import { useState } from 'react';
-import type { FirstBattleSetupView, RegionScoresSetupView, TeaTableSetupView, TwoPlayerSetupView } from '@wonderland/shared';
+import { FACTION_NAMES } from '@wonderland/shared';
+import type { FactionId, FirstBattleSetupView, InitialLeadersSetupView, LobbyView, RegionScoresSetupView, TeaTableSetupView, TwoPlayerSetupView } from '@wonderland/shared';
 import board from '../../../assets/official/plateau-principal-fr.webp';
 
 const blockerLabels = new Intl.ListFormat('fr', { type: 'conjunction' });
+const leaderLabels: Record<FactionId, string> = {
+  alice: 'AL', 'chapelier-fou': 'CF', 'reine-de-coeur': 'RC', jabberwocky: 'JA', 'chat-du-cheshire': 'CC',
+};
 
-export function BoardPreview({ teaTable: { openChairs, activeBlockers }, regionScores, twoPlayerSetup, firstBattle }: {
+export function BoardPreview({ teaTable: { openChairs, activeBlockers }, regionScores, twoPlayerSetup, firstBattle, initialLeaders, players }: {
   teaTable: TeaTableSetupView;
   regionScores: RegionScoresSetupView;
   twoPlayerSetup: TwoPlayerSetupView | null;
   firstBattle: FirstBattleSetupView;
+  initialLeaders: InitialLeadersSetupView | null;
+  players: LobbyView['players'];
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const blocked = activeBlockers.length === 0 ? 'Aucune chaise bloquée.'
@@ -39,8 +45,19 @@ export function BoardPreview({ teaTable: { openChairs, activeBlockers }, regionS
         data-region={twoPlayerSetup.excludedRegion.id} aria-hidden="true">Hors jeu</span>}
       {imageLoaded && <span className="board-first-battle" data-region={firstBattle.region.id} role="img"
         aria-label={`Marqueur Premier combat : ${firstBattle.region.name}`}>1er combat</span>}
+      {imageLoaded && initialLeaders && <div className="board-leader-group" data-zone={initialLeaders.zone} aria-hidden="true">
+        {initialLeaders.leaders.map(({ playerId, faction }) => <span className="board-leader" key={playerId}>{leaderLabels[faction]}</span>)}
+      </div>}
     </div>
     <p className="board-credit">Plateau : Druid City Games · édition française : Lucky Duck Games.</p>
+    {initialLeaders && <>
+      <h4 id="initial-leaders-title">Chefs en Bout de Table</h4>
+      <ul className="initial-leaders" aria-labelledby="initial-leaders-title">
+        {initialLeaders.leaders.map(({ playerId, faction }) => <li key={playerId}>
+          {players.find(({ id }) => id === playerId)?.name} — {FACTION_NAMES[faction]} ({leaderLabels[faction]})
+        </li>)}
+      </ul>
+    </>}
     <table className="board-scores" tabIndex={0}>
       <caption>Marqueurs Score de Région — attribution initiale</caption>
       <thead><tr>

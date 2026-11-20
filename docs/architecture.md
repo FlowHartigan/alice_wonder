@@ -84,7 +84,12 @@ Le store relit le snapshot sous `BEGIN IMMEDIATE`, valide l'intention et écrit 
 
 - En `setup`, `isReadyForSetupK` vérifie qu'une Quête est gardée par siège. `viewFor` expose `initialBets` dans la préparation des seuls admis : `null` avant la fin de J, `[]` après à 2J, sinon les IDs des autres factions dans l'ordre du roster figé (`game.playerIds` et `players`). Ni connexion, ni J1, ni RNG, ni champ stocké ni migration K ; la reprise par `lobby:resume` dérive la même vue du snapshot v9.
 - Un choix nouvellement accepté qui termine J remplace `setup-quest:update` par un seul `lobby:update` personnalisé par socket admis, y compris les autres onglets du même siège. La transaction se termine avant tout envoi. L'échec de l'écriture ou un rejeu n'émet rien. Aucun changement de reçu, journal ou révision du salon : le seul signal collectif est la disponibilité, sans auteur ni décompte ou détail des autres choix. La révélation régionale 2J reste partagée entre admis.
-- Le client fusionne la projection à salon, siège et partie identiques : une réponse de même révision publique ne fait régresser ni la révision privée de J ni une main déjà disponible (y compris `[]`). K n'ajoute aucune action et ne démarre ni L–N ni le Thé. La reprise au-delà de la préparation et celle du hasard futur relèvent de #31.
+- Le client fusionne la projection à salon, siège et partie identiques : une réponse de même révision publique ne fait régresser ni la révision privée de J ni les éléments K–M déjà disponibles (y compris la main `[]`). La reprise au-delà de la préparation et celle du hasard futur relèvent de #31.
+
+### Aides et placement des Chefs (#78)
+
+- `viewFor` utilise la disponibilité de K pour projeter aussi `initialLeaders` : la zone `end-of-table` et les paires siège/faction dans l'ordre figé. Ce champ n'est ni stocké ni publié séparément. Aucun calcul de position à partir de J1 ou du réseau, et aucune interaction avec la projection des chaises ou des Régions.
+- React affiche l'aide consultative quand K est disponible et les Chefs à partir du placement reçu. La géométrie du repère sur le WebP et la liste de repli sont des choix de présentation. Aucune action, série active, mutation ou exécution de N ; la phase reste `setup`.
 
 ### Déploiement cible
 
