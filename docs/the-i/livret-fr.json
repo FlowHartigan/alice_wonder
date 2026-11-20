@@ -239,17 +239,36 @@
       "observation": "Le symbole d’Allié porte un chiffre 1 au lieu du point de la légende p. 8. Aucune définition de #37 ne réunit ces pictogrammes visibles dans le groupe commun : 29424 n’a pas d’affectation. Ne pas compléter les parties peu lisibles ni assimiler cette vue à une carte grise à dé lié."
     },
     {
-      "id": "fr-p11-capacite-allie-en-scene",
+      "id": "fr-p11-capacite-allie-en-scene-alice-1",
       "preuve": "scene-masquee",
       "correspondance": "indeterminee",
-      "illustrations": [
-        {"page": 11, "repere": "Alice, vignette 1, carte bleue sous la flèche"},
-        {"page": 11, "repere": "Reine de cœur, vignette 2, sur la table à droite de la silhouette"},
-        {"page": 11, "repere": "Chat du Cheshire, vignette 1, carte ciblée"},
-        {"page": 11, "repere": "Chat du Cheshire, vignette 2, carte occupée par le Chat"}
-      ],
-      "groupesVisibles": {"commun": ["Portions visibles selon la vue : capacité, dé en coin ou Allié au choix"]},
-      "observation": "Flèches et silhouettes empêchent une comparaison indépendante de chacune de ces vues."
+      "illustrations": [{"page": 11, "repere": "Alice, vignette 1, carte bleue sous la flèche"}],
+      "groupesVisibles": {"commun": ["Dé Éclat en coin (partiel)", "Symbole de capacité (partiel)", "Allié au choix"]},
+      "observation": "La flèche masque plusieurs zones du recto."
+    },
+    {
+      "id": "fr-p11-capacite-allie-en-scene-reine-2",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 11, "repere": "Reine de cœur, vignette 2, sur la table à droite de la silhouette"}],
+      "groupesVisibles": {"commun": ["Dé Éclat en coin", "Déblocage de capacité", "Allié au choix", "Affectation (nombre incertain)"]},
+      "observation": "La flèche coupe le bas de la carte ; le coin d’affectation est trop petit pour fixer le nombre."
+    },
+    {
+      "id": "fr-p11-capacite-allie-en-scene-chat-1",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 11, "repere": "Chat du Cheshire, vignette 1, carte ciblée"}],
+      "groupesVisibles": {"commun": ["Déblocage de capacité", "Dé Éclat en coin", "Portion du symbole Allié"]},
+      "observation": "La flèche recouvre une partie du symbole Allié."
+    },
+    {
+      "id": "fr-p11-capacite-allie-en-scene-chat-2",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 11, "repere": "Chat du Cheshire, vignette 2, carte occupée par le Chat"}],
+      "groupesVisibles": {"commun": ["Portion du symbole multicolore Allié"]},
+      "observation": "La silhouette cache le reste du recto."
     }
   ]
 }

@@ -106,6 +106,35 @@ describe("Thé I — inventaire des illustrations du livret FR", () => {
     });
   });
 
+  it("consigne séparément les quatre vues masquées de la p. 11 sans identifier les rectos", () => {
+    const prefixe = "fr-p11-capacite-allie-en-scene";
+    const vues = partiels.filter((p) => p.id.startsWith(prefixe));
+    expect(vues.map(({ id, preuve, correspondance, illustrations, groupesVisibles, definitionComparee }) => ({
+      id, preuve, correspondance, illustrations, groupesVisibles, definitionComparee,
+    }))).toStrictEqual([
+      {
+        id: `${prefixe}-alice-1`,
+        illustrations: [{ page: 11, repere: "Alice, vignette 1, carte bleue sous la flèche" }],
+        groupesVisibles: { commun: ["Dé Éclat en coin (partiel)", "Symbole de capacité (partiel)", "Allié au choix"] },
+      },
+      {
+        id: `${prefixe}-reine-2`,
+        illustrations: [{ page: 11, repere: "Reine de cœur, vignette 2, sur la table à droite de la silhouette" }],
+        groupesVisibles: { commun: ["Dé Éclat en coin", "Déblocage de capacité", "Allié au choix", "Affectation (nombre incertain)"] },
+      },
+      {
+        id: `${prefixe}-chat-1`,
+        illustrations: [{ page: 11, repere: "Chat du Cheshire, vignette 1, carte ciblée" }],
+        groupesVisibles: { commun: ["Déblocage de capacité", "Dé Éclat en coin", "Portion du symbole Allié"] },
+      },
+      {
+        id: `${prefixe}-chat-2`,
+        illustrations: [{ page: 11, repere: "Chat du Cheshire, vignette 2, carte occupée par le Chat" }],
+        groupesVisibles: { commun: ["Portion du symbole multicolore Allié"] },
+      },
+    ].map((vue) => ({ ...vue, preuve: "scene-masquee", correspondance: "indeterminee", definitionComparee: undefined })));
+  });
+
   it("garde distincts le témoignage FR de L1C10, L2C10 et les deux variantes TTS", () => {
     const l1c10 = exemplaires.find((e) => e.id === "the-i-bgg-l1c10")!;
     const l2c10 = exemplaires.find((e) => e.id === "the-i-bgg-l2c10")!;
