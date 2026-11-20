@@ -119,6 +119,16 @@ Les numéros en gras renvoient aux étapes imprimées p. 4 ; les étapes conséc
 
 **Contrôle :** avec un marché d'essai mêlant Habitant et Objet, obtenir 3 cartes correctement équipées. À 4J avec un résultat de dé 2, conserver le bloqueur sur 5J et placer Premier combat au Jardin des Fleurs vivantes, sans ajouter d'Éclats aux joueurs.
 
+#### Région de Premier combat au moteur
+
+**Parcours validé ([#67](https://github.com/FlowHartigan/alice_wonder/issues/67)).** Livret FR `LKY WWR-R01-FR`, p. 4 étape 11 et p. 21 étape 4 (`WW-COUNT-001`) ; circuit du catalogue [`WW-MAP-001`](#ww-map-001--catalogue-des-régions). `resolveFirstBattleRegion` prend des données internes : `playerCount` (2, 3, 4 ou 5), `dieResult` (nombre de pas déjà fourni, entier fini et non négatif) et `excludedRegionId` (ID connu de la Région déjà retirée, requis à 2J et interdit à 3–5J). Une entrée incohérente est refusée par `TypeError`.
+
+Le calcul renvoie uniquement l'ID final. `getActiveRegionCircuit` donne le départ : Donjon rouge à 3–5J, Région suivante en sens horaire après celle retirée à 2J. Seules les transitions comptent : zéro laisse au départ ; après la dernière Région active, reprendre à la première sans compter la Région exclue. Ainsi, à 3–5J, deux pas donnent le Jardin des Fleurs vivantes ; à 2J, Donjon exclu, deux pas depuis la Forêt de Tulgey donnent la Mare de Larmes. Voir les [tests moteur](docs/rules-coverage.md#tests-du-calcul-de-premier-combat).
+
+Aucun hasard, nouveau retrait, changement d'état ou d'adjacence, crédit ou prélèvement d'Éclats, calcul de score ni ouverture de combat (#20). Le calcul n'est raccordé ni au lancer ni au lancement du salon, à la persistance, au réseau ou à l'interface. Aucun résultat de dé n'est accepté d'un client.
+
+**Composition du dé Éclat non confirmée.** La p. 11 FR mentionne 2 et 3 pour le pouvoir du Chat du Cheshire, sans établir la liste des faces ni leurs fréquences. La texture TTS EN partagée par les modules [2886627193](https://steamcommunity.com/sharedfiles/filedetails/?id=2886627193) et [2065591102](https://steamcommunity.com/sharedfiles/filedetails/?id=2065591102) montre **1, 1, 1, 2, 2, 3** : c'est un seul indice non officiel pour le FR, et le propriétaire n'a pas tranché. Aucune texture n'est importée et aucune distribution n'est retenue. Avant de brancher le lancer en [#12](https://github.com/FlowHartigan/alice_wonder/issues/12), confirmer les faces sur le matériel FR ou par une source officielle applicable, ou obtenir un arbitrage explicite et documenté.
+
 ### WW-SETUP-005 — Initiative et Éclats du round I
 
 **Statut : Validée pour le round I : critère de J1, désignation par l'hôte, ordre des sièges et Éclats.** Sources : livret p. 3, 5 N et tableau « À vos marques, prêts… par-thé ! », p. 6 et 11 ; [décision produit](docs/decisions.md#décisions).
@@ -377,6 +387,7 @@ Pour chaque action jouable, l'implémentation doit préciser :
 4. Lucky Duck Games signale-t-il un erratum pour le tirage FR relevé ? Aucun applicable n'a été trouvé dans les sources consultées (§0).
 5. Quels textes et traductions doivent être utilisés dans l'interface ?
 6. À 2J, quand retirer les deux cartes du marché par rapport aux étapes 4–5 ? Voir `WW-SETUP-004` et `WW-COUNT-001`.
+7. Quelles sont les six faces du dé Éclat FR, répétitions comprises ? Voir [Premier combat](#région-de-premier-combat-au-moteur) ; le calcul à partir d'un résultat fourni ne tranche pas la question.
 
 ## 13. Tableau de suivi
 
