@@ -34,5 +34,4 @@ export const initialRegionScores = z.strictObject({
 
 export type RegionScoresSetupView = {
   placements: { regionId: RegionId; regionName: string; pointsByRound: { 1: number; 2: number; 3: number } }[];
-  removalPending: boolean;
 };

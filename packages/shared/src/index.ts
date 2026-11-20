@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { gameState } from './game.ts';
 import { initialRegionScores } from './region-score-markers.ts';
 import type { RegionScoresSetupView } from './region-score-markers.ts';
+import type { RegionId } from './regions.ts';
 
 export * from './game.ts';
 export * from './region-score-markers.ts';
@@ -138,20 +139,25 @@ export const lobbySnapshotV4 = lobbyWithGame.extend({
   .refine((state) => validPreparation(state) && (state.game !== null || state.regionScores === undefined), preparationMessage);
 export type LobbySnapshotV4 = z.infer<typeof lobbySnapshotV4>;
 
-export const lobbySnapshot = lobbyWithGame.extend({
-  version: z.literal(5), regionScores: initialRegionScores.nullable(),
-}).refine(factionsAreUnique, uniqueFactionMessage)
-  .refine((state) => validPreparation(state) && (state.game === null) === (state.regionScores === null), preparationMessage);
-export const lobbyState = lobbySnapshot.refine(({ firstPlayerId, players }) => (
-  firstPlayerId === null || players.some(({ id }) => id === firstPlayerId)
-), { message: 'Le premier joueur doit avoir un siège dans le salon', path: ['firstPlayerId'] });
-export type LobbyState = z.infer<typeof lobbyState>;
+export const lobbyWithScores = lobbyWithGame.extend({ regionScores: initialRegionScores.nullable() });
+export function validInitialPreparation(state: z.infer<typeof lobbyWithScores>) {
+  return factionsAreUnique(state) && validPreparation(state) && (state.game === null) === (state.regionScores === null);
+}
+export const lobbySnapshotV5 = lobbyWithScores.extend({
+  version: z.literal(5),
+}).refine(validInitialPreparation, preparationMessage);
+export type LobbySnapshotV5 = z.infer<typeof lobbySnapshotV5>;
+
 export type LobbyAction = z.infer<typeof lobbyAction>;
 export type Session = z.infer<typeof credentials>;
 export type TeaTableSetupView = { openChairs: number; activeBlockers: ('4J' | '5J')[] };
 // Public to admitted seats in setup only; not a balance or an active turn.
 export type FirstTeaSetupView = { playerId: string; turn: number; plannedShards: number }[];
-export type LobbyView = Pick<LobbyState, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players' | 'journal'> & {
+export type TwoPlayerSetupView = {
+  revealedQuestTitle: string;
+  excludedRegion: { id: RegionId; name: string };
+};
+export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players' | 'journal'> & {
   you: string;
   canSetReady: boolean;
   canSelectFirstPlayer: boolean;
@@ -160,6 +166,7 @@ export type LobbyView = Pick<LobbyState, 'code' | 'hostId' | 'revision' | 'first
     gameId: string;
     teaTable: TeaTableSetupView;
     regionScores: RegionScoresSetupView;
+    twoPlayerSetup: TwoPlayerSetupView | null;
     firstTeaPreview: FirstTeaSetupView;
   } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];

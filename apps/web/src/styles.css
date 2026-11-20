@@ -76,7 +76,7 @@ small { color: #decce5; margin-inline-start: .25rem; }
 /* Centers of the printed 4/5 markers on the upper edge of the official FR tea table. */
 .board-blocker[data-chair="4J"] { left: 55.4%; }
 .board-blocker[data-chair="5J"] { left: 63.1%; }
-.board-score-marker {
+.board-score-marker, .board-region-excluded {
   position: absolute;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -90,11 +90,12 @@ small { color: #decce5; margin-inline-start: .25rem; }
   white-space: nowrap;
 }
 /* Centers of the three printed score slots next to each region name on the FR WebP. */
-.board-score-marker[data-region="donjon-rouge"] { left: 87.4%; top: 67.1%; }
-.board-score-marker[data-region="foret-de-tulgey"] { left: 56.9%; top: 89.2%; }
-.board-score-marker[data-region="jardin-des-fleurs-vivantes"] { left: 11.2%; top: 63.2%; }
-.board-score-marker[data-region="mare-de-larmes"] { left: 11.3%; top: 51.6%; }
-.board-score-marker[data-region="comte-de-la-deraison"] { left: 88.6%; top: 55.8%; }
+.board-preview-image [data-region="donjon-rouge"] { left: 87.4%; top: 67.1%; }
+.board-preview-image [data-region="foret-de-tulgey"] { left: 56.9%; top: 89.2%; }
+.board-preview-image [data-region="jardin-des-fleurs-vivantes"] { left: 11.2%; top: 63.2%; }
+.board-preview-image [data-region="mare-de-larmes"] { left: 11.3%; top: 51.6%; }
+.board-preview-image [data-region="comte-de-la-deraison"] { left: 88.6%; top: 55.8%; }
+.board-region-excluded { background: #481831; color: #fff5e9; border-color: #fff5e9; box-shadow: 0 0 0 1px #291224; }
 .board-credit { color: #decce5; font-size: .85rem; }
 .board-scores { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .board-scores caption { text-align: start; font-weight: 700; padding-bottom: .35rem; }

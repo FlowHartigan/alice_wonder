@@ -1,8 +1,11 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
-import type { LobbyAction, LobbySnapshotV4, LobbyState, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, Reply } from '@wonderland/shared';
-import { firstTeaForSetup, initializeGame, teaTableForSetup } from './game.ts';
+import type { LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, Reply } from '@wonderland/shared';
+import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
+import type { LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
+import { firstTeaForSetup, initializeGame, shuffle, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
 import { assignRegionScoreMarkers } from './region-score-markers.ts';
+import { resolveTwoPlayerRegionSetup } from './two-player-region-setup.ts';
 
 export * from './battle.ts';
 export * from './game.ts';
@@ -13,7 +16,7 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 5, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null,
+    version: 6, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null, twoPlayerSetup: null,
     players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
   };
@@ -41,8 +44,8 @@ export function migrateLobbyV2(old: LobbyStateV2): LobbyStateV3 {
   return { ...old, version: 3, firstPlayerId: null };
 }
 
-export function migrateLobbyV3(old: LobbyStateV3): LobbyState {
-  return normalizeFirstPlayer({ ...old, version: 5, game: null, regionScores: null });
+export function migrateLobbyV3(old: LobbyStateV3): LobbySnapshotV4 {
+  return { ...old, version: 4, game: null };
 }
 
 function drawRegionScores(playerCount: number, random: RandomSource) {
@@ -54,12 +57,26 @@ function drawRegionScores(playerCount: number, random: RandomSource) {
 }
 
 /** Receives a validated v4 snapshot; only initial setup is eligible for a backfill. */
-export function migrateLobbyV4(old: LobbySnapshotV4, random: RandomSource): LobbyState {
+export function migrateLobbyV4(old: LobbySnapshotV4, random: RandomSource): LobbySnapshotV5 {
   const regionScores = old.game ? old.regionScores ?? drawRegionScores(old.game.playerIds.length, random) : null;
-  return normalizeFirstPlayer({ ...old, version: 5, regionScores });
+  return { ...old, version: 5, regionScores };
 }
 
-/** Restore before projecting, or call after a future roster removal and before committing it. */
+function drawTwoPlayerSetup(regionScores: NonNullable<LobbyState['regionScores']>, random: RandomSource): TwoPlayerSetupSnapshot {
+  const shuffledQuestDeck = shuffle(SETUP_QUEST_CATALOG_V1.quests, random);
+  // Apply WW-COUNT-001 before committing. The order encodes the reveal (head) and all derived results.
+  resolveTwoPlayerRegionSetup({ shuffledQuestDeck, initialRegionScores: regionScores });
+  return { catalogVersion: SETUP_QUEST_CATALOG_V1.version, questOrder: shuffledQuestDeck.map(({ id }) => id) };
+}
+
+/** Receives a validated v5 snapshot, with a complete Score inventory if already launched. */
+export function migrateLobbyV5(old: LobbySnapshotV5, random: RandomSource): LobbyState {
+  const twoPlayerSetup = old.game?.playerIds.length === 2 && old.regionScores
+    ? drawTwoPlayerSetup(old.regionScores, random) : null;
+  return normalizeFirstPlayer({ ...old, version: 6, twoPlayerSetup });
+}
+
+/** For legacy open salons or after a future removal from the roster. */
 export function normalizeFirstPlayer(state: LobbyState): LobbyState {
   if (state.game || state.firstPlayerId === null || state.players.some(({ id }) => id === state.firstPlayerId)) return state;
   return advance({ ...state, firstPlayerId: null }, { revision: state.revision + 1, type: 'first-player-cleared' });
@@ -87,7 +104,8 @@ export function launchPreparation(
   if (blocker) return { ok: false, error: blocker };
   const game = initializeGame(newGameId(), state.players.map(({ id }) => id));
   const regionScores = drawRegionScores(game.playerIds.length, random);
-  return { ok: true, value: advance({ ...state, game, regionScores }, { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
+  const twoPlayerSetup = game.playerIds.length === 2 ? drawTwoPlayerSetup(regionScores, random) : null;
+  return { ok: true, value: advance({ ...state, game, regionScores, twoPlayerSetup }, { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
 }
 
 export function applyLobbyAction(state: LobbyState, actorId: string, action: LobbyEdit): Reply<LobbyState> {
@@ -124,8 +142,11 @@ export function applyLobbyAction(state: LobbyState, actorId: string, action: Lob
 
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
   const hostInLobby = !state.game && playerId === state.hostId;
-  const { game, regionScores } = state;
+  const { game, regionScores, twoPlayerSetup } = state;
   const firstTeaPreview = game?.playerIds.includes(playerId) ? firstTeaForSetup(game, state.firstPlayerId) : null;
+  const regionalSetup = firstTeaPreview && regionScores && twoPlayerSetup ? resolveTwoPlayerRegionSetup({
+    shuffledQuestDeck: twoPlayerSetup.questOrder.map(getSetupQuestV1), initialRegionScores: regionScores,
+  }) : null;
   return {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
     firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
@@ -134,13 +155,18 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
       gameId: game.gameId,
       teaTable: teaTableForSetup(game),
       firstTeaPreview,
+      twoPlayerSetup: regionalSetup ? {
+        revealedQuestTitle: regionalSetup.revealedQuest.title,
+        excludedRegion: { id: regionalSetup.excludedRegionId, name: REGION_CATALOG.names[regionalSetup.excludedRegionId] },
+      } : null,
       regionScores: {
-        placements: REGION_CATALOG.clockwise.map((regionId) => {
-          const { markerId } = regionScores.placements.find((placement) => placement.regionId === regionId)!;
+        placements: REGION_CATALOG.clockwise.flatMap((regionId) => {
+          const placement = (regionalSetup?.regionScores ?? regionScores).placements.find((p) => p.regionId === regionId);
+          if (!placement) return [];
+          const { markerId } = placement;
           const { pointsByRound } = REGION_SCORE_MARKER_CATALOG.markers.find(({ id }) => id === markerId)!;
-          return { regionId, regionName: REGION_CATALOG.names[regionId], pointsByRound: { ...pointsByRound } };
+          return [{ regionId, regionName: REGION_CATALOG.names[regionId], pointsByRound: { ...pointsByRound } }];
         }),
-        removalPending: game.playerIds.length === 2,
       },
     } : null,
     players: state.players.map(({ id, name, ready, faction }) => ({ id, name, ready, faction })),
