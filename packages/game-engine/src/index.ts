@@ -1,5 +1,5 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
-import type { LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, RegionId, Reply } from '@wonderland/shared';
+import type { InitialLeadersSetupView, LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, RegionId, Reply } from '@wonderland/shared';
 import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
 import type { LobbySnapshotV6, LobbySnapshotV7, LobbySnapshotV8, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
 import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-region.ts';
@@ -177,12 +177,22 @@ function firstBattleForSetup(playerCount: number, dieResult: number, excludedReg
   return { dieResult, region: { id, name: REGION_CATALOG.names[id] } };
 }
 
+/** WW-SETUP-003 M — project the frozen roster without rotating it around J1. */
+function initialLeadersForSetup(playerIds: readonly string[], players: LobbyState['players']): InitialLeadersSetupView {
+  return { zone: 'end-of-table', leaders: playerIds.map((playerId) => {
+    const faction = players.find(({ id }) => id === playerId)?.faction;
+    if (!faction) throw new Error('Faction absente du roster figé');
+    return { playerId, faction };
+  }) };
+}
+
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
   const hostInLobby = !state.game && playerId === state.hostId;
   const { game, regionScores, initialQuests, firstBattleRoll, individualResources } = state;
   const admittedGame = game?.playerIds.includes(playerId) ? game : null;
   const firstTeaPreview = admittedGame ? firstTeaForSetup(admittedGame, state.firstPlayerId) : null;
   const initialQuest = admittedGame ? initialQuestFor(state, playerId) : undefined;
+  const initialBets = initialBetsFor(state, playerId);
   const revealed = initialQuests?.twoPlayerOut ? getSetupQuestV1(initialQuests.twoPlayerOut.revealed) : null;
   const excluded = revealed?.exploitRegionId;
   return {
@@ -195,7 +205,8 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
       firstTeaPreview,
       individualResources: projectInitialResources(individualResources),
       initialQuest,
-      initialBets: initialBetsFor(state, playerId),
+      initialBets,
+      initialLeaders: initialBets === null ? null : initialLeadersForSetup(admittedGame.playerIds, state.players),
       firstBattle: firstBattleForSetup(admittedGame.playerIds.length, firstBattleRoll.result, excluded),
       twoPlayerSetup: revealed && excluded ? {
         revealedQuestTitle: revealed.title,

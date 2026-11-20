@@ -7,6 +7,7 @@ import { credentials, FACTION_NAMES, MAX_PLAYERS, MIN_PLAYERS, roomCode } from '
 import type { ClientEvents, ErrorCode, IndividualResourcesSetupView, InitialQuestView, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
 import { BoardPreview } from './BoardPreview.tsx';
 import { InitialQuest } from './InitialQuest.tsx';
+import { SetupPhaseReference } from './SetupPhaseReference.tsx';
 import { mergeLobbyView } from './merge-lobby-view.ts';
 import './styles.css';
 
@@ -314,9 +315,11 @@ function App() {
             <p>Les Paris ne se jouent pas pendant la préparation.</p>
           </section>}
         </div>
+        {preparation.initialBets !== null && <SetupPhaseReference />}
         <IndividualResources players={view.players} resources={preparation.individualResources} />
         <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores}
-          twoPlayerSetup={preparation.twoPlayerSetup} firstBattle={preparation.firstBattle} />
+          twoPlayerSetup={preparation.twoPlayerSetup} firstBattle={preparation.firstBattle}
+          initialLeaders={preparation.initialLeaders} players={view.players} />
       </section> : <>
       <section className="panel" aria-labelledby="players">
         <div className="section-title"><h2 id="players">Joueurs</h2><span>{view.players.length} / {MAX_PLAYERS}</span></div>

@@ -7,9 +7,9 @@ export function mergeLobbyView(previous: LobbyView | undefined, next: LobbyView)
   const incoming = next.preparation;
   if (!current || !incoming || current.gameId !== incoming.gameId) return next;
 
-  // J and K advance without incrementing the public lobby revision.
+  // J and K–M advance without incrementing the public lobby revision.
   const initialQuest = current.initialQuest.revision > incoming.initialQuest.revision
     ? current.initialQuest : incoming.initialQuest;
-  const initialBets = incoming.initialBets ?? current.initialBets;
-  return { ...next, preparation: { ...incoming, initialQuest, initialBets } };
+  const { initialBets, initialLeaders } = incoming.initialBets === null ? current : incoming;
+  return { ...next, preparation: { ...incoming, initialQuest, initialBets, initialLeaders } };
 }

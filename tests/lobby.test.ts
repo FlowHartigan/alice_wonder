@@ -363,7 +363,7 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
       canSetReady: false, canSelectFirstPlayer: false, launch: null,
     });
     expect(publicPreparation(guestView)).toEqual(publicPreparation(prepared));
-    expect(publicPreparation(prepared)).toEqual({ gameId: expect.any(String), teaTable: { openChairs: 11, activeBlockers: ['4J', '5J'] },
+    expect(publicPreparation(prepared)).toEqual({ gameId: expect.any(String), teaTable: { openChairs: 11, activeBlockers: ['4J', '5J'] }, initialLeaders: null,
       firstTeaPreview: [
         { playerId: joined.view.you, turn: 1, plannedShards: 2 },
         { playerId: created.view.you, turn: 2, plannedShards: 1 },
@@ -486,7 +486,7 @@ it.each([
   const { view: prepared, received: allViews } = await actionWithUpdates(host, seats, request);
   expect(allViews[0]).toEqual(prepared);
   const clockwise = [...seatIds.slice(1), seatIds[0]];
-  expect(publicPreparation(prepared)).toEqual({ gameId: expect.any(String), teaTable,
+  expect(publicPreparation(prepared)).toEqual({ gameId: expect.any(String), teaTable, initialLeaders: null,
     firstTeaPreview: shards.map((plannedShards, i) => ({ playerId: clockwise[i], turn: i + 1, plannedShards })),
     individualResources: seatIds.map((id, i) => expectedResources(id, factions[i], count, i === 0 ? count + 2 : 0)),
     regionScores: { placements: count === 2 ? expectedActivePlacements : expectedPlacements },
@@ -572,7 +572,7 @@ function questAction(offer: ReturnType<typeof offerOf>, index: number, actionId:
     params: { decisionId: offer.decisionId, optionId: offer.cards[index].optionId } };
 }
 
-it.each([2, 3, 4, 5])('J et K à %i sièges : choix privés, signal unique et personnalisé, reprise et rejeu', async (count) => {
+it.each([2, 3, 4, 5])('J et K–M à %i sièges : choix privés, signal unique et personnalisé, reprise et rejeu', async (count) => {
   const database = tempDatabase();
   const random = vi.fn(() => 0);
   const url = await start(database, random);
@@ -580,6 +580,8 @@ it.each([2, 3, 4, 5])('J et K à %i sièges : choix privés, signal unique et pe
   const { received: views } = await actionWithUpdates(host, seats, launch(ready.revision));
   const offers = views.map(offerOf);
   expect(views.map((v) => v.preparation?.initialBets)).toEqual(Array(count).fill(null));
+  expect(views.map((v) => v.preparation?.initialLeaders)).toEqual(Array(count).fill(null));
+  const initialLeaders = { zone: 'end-of-table', leaders: views.map(({ you }, i) => ({ playerId: you, faction: FACTION_IDS[i] })) };
   expect(new Set(offers.flatMap(({ cards }) => cards.map(({ title }) => title))).size).toBe(2 * count);
   const db = new DatabaseSync(database);
   const read = () => lobbyState.parse(JSON.parse(String(databaseContents(db).rooms[0].snapshot)));
@@ -607,8 +609,8 @@ it.each([2, 3, 4, 5])('J et K à %i sièges : choix privés, signal unique et pe
     const requests = offers.map((offer, i) => questAction(offer, i % 2, sharedActionId));
     const receipts = [];
     const keptViews: InitialQuestView[] = [];
-    // At 4J, leave one seat (and its faction) in the roster but entirely offline at the barrier.
-    const offlineSeat = count === 4 ? 1 : -1;
+    // At 4–5J, leave one ready seat entirely offline when K–M become visible.
+    const offlineSeat = count >= 4 ? 1 : -1;
     for (const [i, socket] of seats.entries()) {
       const last = i === count - 1;
       if (last && offlineSeat !== -1) seats[offlineSeat].disconnect();
@@ -634,8 +636,11 @@ it.each([2, 3, 4, 5])('J et K à %i sièges : choix privés, signal unique et pe
       expect(current.game).toMatchObject({ phase: { type: 'setup' }, revision: i + 1 });
       expect(isReadyForSetupK(current)).toBe(last);
       expect(current).not.toHaveProperty('initialBets');
+      expect(current).not.toHaveProperty('initialLeaders');
+      expect(current.game).not.toHaveProperty('initialLeaders');
       for (const [j, view] of views.entries()) {
         const projected = viewFor(current, view.you);
+        expect(projected.preparation?.initialLeaders).toStrictEqual(last ? initialLeaders : null);
         if (j > i) expect(projected).toEqual(view); // No revision, signal, or observable pending count change.
         expect(projected.journal).toEqual(view.journal);
         expectFiltered(projected);
@@ -648,6 +653,8 @@ it.each([2, 3, 4, 5])('J et K à %i sièges : choix privés, signal unique et pe
         .toEqual({ ok: false, error: 'decision-unavailable' });
       expect(await outsider.emitWithAck('setup-quest:choose', requests[i])).toEqual({ ok: false, error: 'unauthorized' });
       expect(await outsider.emitWithAck('lobby:join', { code: created.session.code, name: 'Hors salon' })).toEqual({ ok: false, error: 'room-closed' });
+      expect(await outsider.emitWithAck('lobby:resume', { code: created.session.code, token: 'X'.repeat(43) }))
+        .toEqual({ ok: false, error: 'unauthorized' });
       expect(databaseContents(db)).toEqual(persisted);
       expect(random).toHaveBeenCalledTimes(draws);
       // Drain each recipient connection before asserting absence of cross-seat messages.
@@ -659,6 +666,7 @@ it.each([2, 3, 4, 5])('J et K à %i sièges : choix privés, signal unique et pe
         const original = views[j];
         return [['lobby:update', { ...original, preparation: { ...original.preparation,
           initialQuest: keptViews[j], initialBets: count === 2 ? [] : FACTION_IDS.slice(0, count).filter((_, k) => j !== k),
+          initialLeaders,
         } }]];
       });
       expect(updates.map((log) => log.mock.calls)).toEqual(expectedCalls);
@@ -670,18 +678,27 @@ it.each([2, 3, 4, 5])('J et K à %i sièges : choix privés, signal unique et pe
       .toEqual([...questIds].sort());
     const persisted = databaseContents(db);
     const dataVersion = db.prepare('PRAGMA data_version').get();
+    if (offlineSeat !== -1) {
+      const reconnected = await connect(url);
+      const resumed = success(await reconnected.emitWithAck('lobby:resume', sessions[offlineSeat]));
+      expect(resumed.preparation?.initialLeaders).toStrictEqual(initialLeaders);
+      expect(resumed.preparation?.initialQuest).toEqual(keptViews[offlineSeat]);
+    }
     await stop();
     const restoredUrl = await start(database, random);
     for (const [i, session] of sessions.entries()) {
       const socket = await connect(restoredUrl);
       const log = vi.fn();
       socket.onAny(log);
-      expect(success(await socket.emitWithAck('lobby:resume', session))).toEqual(viewFor(all, views[i].you));
+      const restored = success(await socket.emitWithAck('lobby:resume', session));
+      expect(restored).toEqual(viewFor(all, views[i].you));
+      expect(restored.preparation?.initialLeaders).toStrictEqual(initialLeaders);
       expect(success(await socket.emitWithAck('setup-quest:choose', requests[i]))).toEqual(receipts[i]);
       expect(log).not.toHaveBeenCalled();
     }
     expect(databaseContents(db)).toEqual(persisted);
     expect(db.prepare('PRAGMA data_version').get()).toEqual(dataVersion);
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 9 });
     expect(random).toHaveBeenCalledTimes(draws);
   } finally { db.close(); }
 });
@@ -743,7 +760,7 @@ it('J refuse les intentions non autorisées et sérialise doublons, options riva
   } finally { db.close(); }
 });
 
-it('la reprise avant le dernier choix et son rollback gardent K fermé jusqu’au commit réussi', async () => {
+it('la reprise avant le dernier choix et son rollback gardent K–M masqués jusqu’au commit réussi', async () => {
   const database = tempDatabase();
   const random = vi.fn(() => 0);
   const { host, guest, ready, sessions } = await readyTable(await start(database, random));
@@ -751,7 +768,7 @@ it('la reprise avant le dernier choix et son rollback gardent K fermé jusqu’a
   const firstChoice = questAction(offerOf(hostView), 0);
   const firstReceipt = success(await host.emitWithAck('setup-quest:choose', firstChoice));
   const hostKept = success(await host.emitWithAck('lobby:resume', sessions[0]));
-  expect(hostKept.preparation).toMatchObject({ initialQuest: { type: 'kept' }, initialBets: null });
+  expect(hostKept.preparation).toMatchObject({ initialQuest: { type: 'kept' }, initialBets: null, initialLeaders: null });
   const db = new DatabaseSync(database);
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
   const ownUpdates = vi.fn();
@@ -783,7 +800,11 @@ it('la reprise avant le dernier choix et son rollback gardent K fermé jusqu’a
     expect(random).toHaveBeenCalledTimes(launchDraws(2) + 20 + 2 * 21);
     for (const [i, socket] of [resumedHost, resumedGuest].entries()) {
       const view = success(await socket.emitWithAck('lobby:resume', sessions[i]));
-      expect(view.preparation).toMatchObject({ initialQuest: { type: 'kept' }, initialBets: [] });
+      expect(view.preparation).toMatchObject({ initialQuest: { type: 'kept' }, initialBets: [],
+        initialLeaders: { zone: 'end-of-table', leaders: [
+          { playerId: hostView.you, faction: FACTION_IDS[0] }, { playerId: guestView.you, faction: FACTION_IDS[1] },
+        ] },
+      });
       expect([ownUpdates, guestUpdates][i].mock.calls).toEqual([['lobby:update', view]]);
     }
   } finally { log.mockRestore(); db.close(); }

@@ -159,6 +159,10 @@ export type LobbySnapshotV5 = z.infer<typeof lobbySnapshotV5>;
 export type LobbyAction = z.infer<typeof lobbyAction>;
 export type Session = z.infer<typeof credentials>;
 export type TeaTableSetupView = { openChairs: number; activeBlockers: ('4J' | '5J')[] };
+export type InitialLeadersSetupView = {
+  zone: 'end-of-table'; // Separate from chairs, deck space and Regions.
+  leaders: { playerId: string; faction: FactionId }[];
+};
 // Public to admitted seats in setup only; not a balance or an active turn.
 export type FirstTeaSetupView = { playerId: string; turn: number; plannedShards: number }[];
 // Initial holdings of admitted seats. Token zones are represented by counts alone.
@@ -210,6 +214,8 @@ export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 
     initialQuest: InitialQuestView;
     /** null until J is complete; [] is the available hand at 2J. */
     initialBets: FactionId[] | null;
+    /** Initial placement M, available in the same view as K. */
+    initialLeaders: InitialLeadersSetupView | null;
   } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };

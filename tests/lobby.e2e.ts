@@ -17,6 +17,11 @@ const resourcesTitle = 'Dotation individuelle de départ';
 const questTitle = 'Votre Quête initiale (étape J)';
 const questPanel = (page: Page) => page.getByRole('region', { name: questTitle });
 const betsPanel = (page: Page) => page.getByRole('region', { name: 'Vos cartes Pari' });
+const phaseReference = (page: Page) => page.getByRole('region', { name: 'Aide des phases' });
+const leadersList = (page: Page) => page.getByRole('list', { name: 'Chefs en Bout de Table' });
+const leaderGroup = (page: Page) => page.locator('.board-leader-group');
+const allyLinkName = 'Tableau des Alliés A–D (livret officiel FR, p. 9)';
+const rulebook = 'https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416';
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
 const reveal = 'Quête révélée : Remporter le croquet du Jardin. Région hors jeu : Jardin des Fleurs vivantes.';
 const excluded = 'jardin-des-fleurs-vivantes';
@@ -28,6 +33,51 @@ const scoreSlots = [
   { id: 'mare-de-larmes', name: 'Mare de Larmes', pv: ['4', '8', '8'], x: 0.113, y: 0.516 },
   { id: 'comte-de-la-deraison', name: 'Comté de la Déraison', pv: ['6', '6', '8'], x: 0.886, y: 0.558 },
 ];
+
+async function checkNoLateSetup(player: Page) {
+  await expect(betsPanel(player)).toHaveCount(0);
+  await expect(phaseReference(player)).toHaveCount(0);
+  await expect(leadersList(player)).toHaveCount(0);
+  await expect(leaderGroup(player)).toHaveCount(0);
+}
+
+async function checkPhaseReference(player: Page) {
+  const aide = phaseReference(player);
+  await expect(aide.getByRole('heading', { level: 4 })).toHaveText(['Thé — livret FR, p. 7', 'Guerre — livret FR, p. 12']);
+  await expect(aide.getByRole('link', { name: /exceptions à deux joueurs/ })).toHaveAttribute('href', `${rulebook}#page=21`);
+  await expect(aide.getByRole('link', { name: allyLinkName })).toHaveAttribute('href', `${rulebook}#page=9`);
+  await expect(aide).toContainText('Aucune série d’Alliés active n’est encore configurée.');
+  await expect(aide.locator('button, input, select, textarea')).toHaveCount(0);
+  await expect(player.getByRole('region', { name: 'Préparation de la partie' }).getByRole('button')).toHaveCount(0);
+}
+
+async function checkLeaders(player: Page, expected: [string, string][], { imageLoaded = true, compact = false } = {}) {
+  const list = leadersList(player);
+  await expect(list).toBeVisible();
+  await expect(list.getByRole('listitem')).toHaveText(expected.map(([name, code]) => `${name} (${code})`));
+  const group = leaderGroup(player);
+  if (!imageLoaded) {
+    await expect(group).toHaveCount(0);
+    return;
+  }
+  await expect(group).toHaveAttribute('data-zone', 'end-of-table');
+  await expect(group).toHaveAttribute('aria-hidden', 'true');
+  await expect(group).toHaveCSS('pointer-events', 'none');
+  const markers = group.locator('.board-leader');
+  await expect(markers).toHaveText(expected.map(([, code]) => code));
+  const image = await player.getByRole('img', { name: boardName }).boundingBox();
+  if (!image) throw new Error('Plateau introuvable');
+  for (const marker of await markers.all()) {
+    await expect(marker).toBeVisible();
+    const box = await marker.boundingBox();
+    if (!box) throw new Error('Repère de Chef introuvable');
+    // Between the deck and bottom chair: near the ribbon, or inward by the die spot on narrow boards at 2J.
+    expect((box.x - image.x) / image.width).toBeGreaterThan(compact ? 0.685 : 0.74);
+    expect((box.x + box.width - image.x) / image.width).toBeLessThan(compact ? 0.76 : 0.835);
+    expect((box.y - image.y) / image.height).toBeGreaterThan(compact ? 0.36 : 0.33);
+    expect((box.y + box.height - image.y) / image.height).toBeLessThan(compact ? 0.55 : 0.525);
+  }
+}
 
 function firstBattleSummary(regionName: string) {
   return `Premier combat : ${regionName}. Dé Éclat : 2.`;
@@ -280,7 +330,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
           const panel = player.getByRole('region', { name: 'Préparation de la partie' });
           await expect(panel.getByText('Admissions fermées.')).toBeVisible();
           await expect(panel.getByText(/^Salon [A-F0-9]{8} · 2 joueurs$/)).toBeVisible();
-          const seats = panel.getByRole('listitem');
+          const seats = panel.getByRole('list', { name: 'Sièges et factions de la préparation' }).getByRole('listitem');
           await expect(seats).toHaveCount(2);
           await expect(seats.nth(0)).toContainText(/Camille \(siège 1\).*Alice/);
           await expect(seats.nth(1)).toContainText(/Dinah \(siège 2\).*Jabberwocky.*Premier joueur \(J1\)/);
@@ -298,7 +348,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await checkPreparation();
       const hostQuest = questPanel(page);
       const guestQuest = questPanel(guest);
-      for (const player of [page, guest]) await expect(betsPanel(player)).toHaveCount(0);
+      for (const player of [page, guest]) await checkNoLateSetup(player);
       for (const panel of [hostQuest, guestQuest]) {
         await expect(panel.getByRole('article')).toHaveCount(2);
         await expect(panel.getByText(/^Exploit — /)).toHaveCount(2);
@@ -325,7 +375,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(hostQuest.getByRole('heading', { level: 4 })).toHaveText([hostTitles[1]]);
       await expect(guestQuest.getByRole('heading', { level: 4 })).toHaveText(guestTitles);
       await expect(guestQuest.getByRole('status')).toContainText('Ces deux propositions sont privées');
-      for (const player of [page, guest]) await expect(betsPanel(player)).toHaveCount(0);
+      for (const player of [page, guest]) await checkNoLateSetup(player);
       await guestQuest.getByRole('button', { name: `Garder « ${guestTitles[0]} »` }).click();
       await expect(guestQuest.getByRole('status')).toHaveText(/Choix enregistré/);
       const checkEmptyHand = async (player: Page) => {
@@ -333,7 +383,13 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         await expect(betsPanel(player).getByRole('listitem')).toHaveCount(0);
         await expect(betsPanel(player).getByRole('button')).toHaveCount(0);
       };
-      await Promise.all([checkEmptyHand(page), checkEmptyHand(guest)]);
+      const leaders: [string, string][] = [['Camille — Alice', 'AL'], ['Dinah — Jabberwocky', 'JA']];
+      const checkLateSetup = async (player: Page, compact = false) => {
+        await checkEmptyHand(player);
+        await checkPhaseReference(player);
+        await checkLeaders(player, leaders, { compact });
+      };
+      await Promise.all([checkLateSetup(page), checkLateSetup(guest)]);
       await expect(guest.getByRole('region', { name: 'Journal du salon' })).not.toContainText(guestTitles[0]);
       for (const [player, title, absent] of [[page, hostTitles[1], guestTitles[0]], [guest, guestTitles[0], hostTitles[1]]] as const) {
         await player.reload();
@@ -341,7 +397,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         await expect(questPanel(player).getByRole('button')).toHaveCount(0);
         await expect(player.getByText(absent, { exact: true })).toHaveCount(0);
         await expect(player.getByText(/Le premier Thé n’a pas commencé/)).toBeVisible();
-        await checkEmptyHand(player);
+        await checkLateSetup(player);
       }
 
       await guest.close();
@@ -349,6 +405,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await guest.setViewportSize({ width: 320, height: 720 });
       await guest.goto(link);
       await checkPreparation();
+      await checkLateSetup(guest, true);
 
       await guest.route('**/plateau-principal-fr*.webp', (route) => route.abort());
       await guest.reload();
@@ -359,6 +416,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(preview.locator('.board-blocker')).toHaveCount(0);
       await checkScores(guest, { twoPlayers: true, imageLoaded: false });
       await checkFirstBattle(guest, scoreSlots[0], false);
+      await checkLeaders(guest, leaders, { imageLoaded: false });
 
       const newcomer = await otherBrowser.newPage();
       await newcomer.goto(link);
@@ -369,9 +427,16 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(newcomer.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
       await expect(newcomer.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
       await expect(questPanel(newcomer)).toHaveCount(0);
-      await expect(betsPanel(newcomer)).toHaveCount(0);
+      await checkNoLateSetup(newcomer);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
       await expect(newcomer.getByText(/Quête révélée|Région hors jeu|Premier combat|Dé Éclat/)).toHaveCount(0);
+      // Exercise the native link with the keyboard without depending on an external PDF viewer.
+      await page.route(rulebook, (route) => route.fulfill({ contentType: 'text/plain', body: 'Livret FR' }));
+      await page.getByRole('table', { name: scoreCaption }).focus();
+      await page.keyboard.press('Shift+Tab');
+      await expect(phaseReference(page).getByRole('link', { name: allyLinkName })).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(`${rulebook}#page=9`);
       expect(draws).toBe(35 + 2 * 10 + 20 + 21); // Chaque retour agrandit la pioche avant son mélange.
     } finally {
       await otherBrowser.close();
@@ -381,7 +446,66 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
   }
 });
 
-for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : Quêtes et mains de Pari privées`, async ({ page }) => {
+test('à 320 px, les Chefs au Bout de Table ne recouvrent pas Premier combat au Comté', async ({ browser, page }) => {
+  const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
+    random: () => 0 }); // Le mélange révèle le Jardin ; le dé 1 mène de la Mare au Comté.
+  const listening = once(server.http, 'listening');
+  server.http.listen(0, '127.0.0.1');
+  try {
+    await listening;
+    const address = server.http.address();
+    if (!address || typeof address === 'string') throw new Error('Missing server address');
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto(`http://127.0.0.1:${address.port}`);
+    await page.getByLabel('Votre nom').fill('Camille');
+    await page.getByRole('button', { name: 'Créer le salon' }).click();
+    const link = await page.getByLabel('Lien du salon').inputValue();
+    const guest = await browser.newPage();
+    try {
+      await guest.goto(link);
+      await guest.getByLabel('Votre nom').fill('Dinah');
+      await guest.getByRole('button', { name: 'Rejoindre le salon' }).click();
+      await page.getByRole('button', { name: 'Alice', exact: true }).click();
+      await guest.getByRole('button', { name: 'Jabberwocky', exact: true }).click();
+      await page.getByRole('button', { name: 'Je suis prêt' }).click();
+      await guest.getByRole('button', { name: 'Je suis prêt' }).click();
+      await expect(page.getByText('Dinah est prêt.', { exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Dinah (siège 2)' }).click();
+      await page.getByRole('button', { name: 'Lancer la préparation' }).click();
+
+      const preview = page.getByRole('region', { name: previewTitle });
+      await expect(preview.getByText(reveal, { exact: true })).toBeVisible();
+      await expect(preview.getByText('Premier combat : Comté de la Déraison. Dé Éclat : 1.', { exact: true })).toBeVisible();
+      await checkNoLateSetup(page);
+      await questPanel(page).getByRole('button', { name: 'Garder « Rassembler une ménagerie »' }).click();
+      await questPanel(guest).getByRole('button', { name: 'Garder « La révolution industrielle »' }).click();
+      for (const width of [320, 280]) {
+        await page.setViewportSize({ width, height: 720 });
+        await checkLeaders(page, [['Camille — Alice', 'AL'], ['Dinah — Jabberwocky', 'JA']], { compact: true });
+        await expect(preview.getByRole('img', { name: 'Marqueur Premier combat : Comté de la Déraison' })).toBeVisible();
+
+        const groupBox = await leaderGroup(page).boundingBox();
+        if (!groupBox) throw new Error('Groupe de Chefs non visible');
+        const otherMarkers = preview.locator('.board-first-battle, .board-score-marker, .board-blocker, .board-region-excluded');
+        await expect(otherMarkers).toHaveCount(8); // Premier combat, quatre scores, deux bloqueurs et une Région écartée.
+        for (const marker of await otherMarkers.all()) {
+          await expect(marker).toBeVisible();
+          const box = await marker.boundingBox();
+          if (!box) throw new Error('Repère du plateau non visible');
+          const overlap = groupBox.x < box.x + box.width && box.x < groupBox.x + groupBox.width
+            && groupBox.y < box.y + box.height && box.y < groupBox.y + groupBox.height;
+          expect(overlap, `${width} px : Chefs / ${await marker.textContent()}`).toBe(false);
+        }
+      }
+    } finally {
+      await guest.close();
+    }
+  } finally {
+    await server.close();
+  }
+});
+
+for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : Quêtes et Paris privés, aides et Chefs`, async ({ page }) => {
   let draws = 0;
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
     random: () => ++draws === 35 ? 0.5 : 0 }); // Le dé suit aussi le mélange de Quêtes à 3–5J.
@@ -453,7 +577,8 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
       .map((playerId, i) => ({ playerId, turn: i + 1, plannedShards: shards[i] })));
     expect(shared?.twoPlayerSetup).toBeNull();
     expect(shared?.initialBets).toBeNull();
-    await expect(betsPanel(page)).toHaveCount(0);
+    expect(shared?.initialLeaders).toBeNull();
+    await checkNoLateSetup(page);
     expect(shared?.firstBattle).toEqual({ dieResult: 2, region: { id: garden.id, name: garden.name } });
     // Liste exacte : les zones de jetons ne livrent que des nombres, même au propriétaire du sac.
     const expectedResources = [hostId, ...guests.map(({ id }) => id)].map((playerId, i) => ({
@@ -509,24 +634,34 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
       expect(receipt.revision).toBe(1);
     }));
     await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText(ownTitles);
-    await expect(betsPanel(page)).toHaveCount(0);
+    await checkNoLateSetup(page);
     await questPanel(page).getByRole('button', { name: `Garder « ${ownTitles[0]} »` }).click();
     await expect(questPanel(page).getByRole('status')).toContainText('Choix enregistré');
     const checkHand = async () => {
       await expect(betsPanel(page).getByRole('listitem')).toHaveText(FACTION_IDS.slice(1, count).map((id) => FACTION_NAMES[id]));
       await expect(betsPanel(page).getByRole('button')).toHaveCount(0);
     };
+    const leaderNames = ['Camille', ...guests.map((_, i) => `Invité ${i + 1}`)];
+    const leaderCodes = ['AL', 'CF', 'RC', 'JA', 'CC'];
+    const leaders: [string, string][] = FACTION_IDS.slice(0, count).map((faction, i) => [`${leaderNames[i]} — ${FACTION_NAMES[faction]}`, leaderCodes[i]]);
+    const initialLeaders = { zone: 'end-of-table', leaders: [hostId, ...guests.map(({ id }) => id)]
+      .map((playerId, i) => ({ playerId, faction: FACTION_IDS[i] })) };
     await checkHand();
+    await checkPhaseReference(page);
+    await checkLeaders(page, leaders);
     for (const [i, socket] of guestSockets.entries()) {
       const view = success(await socket.emitWithAck('lobby:resume', guests[i].session));
       expect(view).toEqual(preparedViews.get(guests[i].id));
       expect(view.preparation?.initialQuest.type).toBe('kept');
       expect(view.preparation?.initialBets).toEqual(FACTION_IDS.slice(0, count).filter((_, j) => j !== i + 1));
+      expect(view.preparation?.initialLeaders).toStrictEqual(initialLeaders);
       expect(updates[i]).toEqual(['setup-quest:update', 'lobby:update']);
     }
     await page.reload();
     await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText([ownTitles[0]]);
     await checkHand();
+    await checkPhaseReference(page);
+    await checkLeaders(page, leaders);
     await expect(page.getByText(/Le premier Thé n’a pas commencé/)).toBeVisible();
     expect(draws).toBe(35 + count * 9 + Array.from({ length: count }, (_, i) => 30 - 2 * count + i).reduce((a, b) => a + b));
   } finally {
