@@ -123,7 +123,7 @@ const rollOfOne = { dieVersion: 1, result: 1 };
 
 function publicPreparation(view: LobbyView) {
   if (!view.preparation) return null;
-  const { initialQuest: _, ...shared } = view.preparation;
+  const { initialQuest: _, initialBets: __, ...shared } = view.preparation;
   return shared;
 }
 
@@ -196,9 +196,12 @@ async function readyTable(url: string, count = 2) {
   const [host, guest, ...others] = await Promise.all(Array.from({ length: count }, () => connect(url)));
   const created = success(await host.emitWithAck('lobby:create', { name: 'Camille' }));
   const joined = success(await guest.emitWithAck('lobby:join', { code: created.session.code, name: 'Dinah' }));
+  const sessions = [created.session, joined.session];
   let view = joined.view;
   for (const [i, client] of others.entries()) {
-    view = success(await client.emitWithAck('lobby:join', { code: created.session.code, name: `Invité ${i + 2}` })).view;
+    const admission = success(await client.emitWithAck('lobby:join', { code: created.session.code, name: `Invité ${i + 2}` }));
+    sessions.push(admission.session);
+    view = admission.view;
   }
   const edits = [];
   for (const [i, client] of [host, guest, ...others].entries()) {
@@ -211,7 +214,7 @@ async function readyTable(url: string, count = 2) {
   const choice = selectFirstPlayer(joined.view.you, view.revision);
   const { view: ready, received: [guestReady] } = await actionWithUpdates(host, [guest], choice);
   expect(guestReady).toMatchObject({ you: joined.view.you, revision: choice.expectedRevision + 1, firstPlayerId: choice.firstPlayerId });
-  return { host, guest, seats: [host, guest, ...others], created, joined, ready, choice, edits };
+  return { host, guest, seats: [host, guest, ...others], sessions, created, joined, ready, choice, edits };
 }
 
 function databaseContents(db: DatabaseSync) {
@@ -569,13 +572,14 @@ function questAction(offer: ReturnType<typeof offerOf>, index: number, actionId:
     params: { decisionId: offer.decisionId, optionId: offer.cards[index].optionId } };
 }
 
-it.each([2, 3, 4, 5])('J à %i sièges : offre privée, déplacement et mélange immédiats, reprise et gate K', async (count) => {
+it.each([2, 3, 4, 5])('J et K à %i sièges : choix privés, signal unique et personnalisé, reprise et rejeu', async (count) => {
   const database = tempDatabase();
   const random = vi.fn(() => 0);
   const url = await start(database, random);
-  const { host, ready, created, joined, seats } = await readyTable(url, count);
+  const { host, ready, created, joined, seats, sessions } = await readyTable(url, count);
   const { received: views } = await actionWithUpdates(host, seats, launch(ready.revision));
   const offers = views.map(offerOf);
+  expect(views.map((v) => v.preparation?.initialBets)).toEqual(Array(count).fill(null));
   expect(new Set(offers.flatMap(({ cards }) => cards.map(({ title }) => title))).size).toBe(2 * count);
   const db = new DatabaseSync(database);
   const read = () => lobbyState.parse(JSON.parse(String(databaseContents(db).rooms[0].snapshot)));
@@ -590,7 +594,11 @@ it.each([2, 3, 4, 5])('J à %i sièges : offre privée, déplacement et mélange
     expect(isReadyForSetupK(before)).toBe(false);
     const shadow = await connect(url); // Second socket for the same seat, using the real resume path.
     expect(success(await shadow.emitWithAck('lobby:resume', created.session))).toEqual(views[0]);
-    const updates = [...seats, shadow].map((socket) => {
+    const lastShadow = await connect(url);
+    expect(success(await lastShadow.emitWithAck('lobby:resume', sessions.at(-1)!))).toEqual(views.at(-1));
+    const outsider = await connect(url);
+    const allSockets = [...seats, shadow, lastShadow, outsider];
+    const updates = allSockets.map((socket) => {
       const log = vi.fn();
       socket.onAny(log);
       return log;
@@ -598,15 +606,19 @@ it.each([2, 3, 4, 5])('J à %i sièges : offre privée, déplacement et mélange
     const sharedActionId = randomUUID(); // Same key can succeed independently for every seat.
     const requests = offers.map((offer, i) => questAction(offer, i % 2, sharedActionId));
     const receipts = [];
+    const keptViews: InitialQuestView[] = [];
+    // At 4J, leave one seat (and its faction) in the roster but entirely offline at the barrier.
+    const offlineSeat = count === 4 ? 1 : -1;
     for (const [i, socket] of seats.entries()) {
+      const last = i === count - 1;
+      if (last && offlineSeat !== -1) seats[offlineSeat].disconnect();
       const { optionId: _, ...card } = offers[i].cards[i % 2];
       const [kept, returned] = i % 2 ? originalOffers[i].toReversed() : originalOffers[i];
-      const pendingUpdate = new Promise<InitialQuestView>((resolve) => socket.once('setup-quest:update', resolve));
       const receipt = success(await socket.emitWithAck('setup-quest:choose', requests[i]));
       expect(receipt).toEqual({ revision: 1, event: { type: 'decision-submitted', ...requests[i].params } });
       receipts.push(receipt);
-      const authorView = await pendingUpdate;
-      expect(authorView).toEqual({ gameId: before.game!.gameId, revision: 1, type: 'kept', card });
+      const authorView = { gameId: before.game!.gameId, revision: 1, type: 'kept', card } as const;
+      keptViews.push(authorView);
       if (i === 0) expect(success(await shadow.emitWithAck('lobby:resume', created.session)).preparation?.initialQuest).toEqual(authorView);
       if (i === 0) expect(success(await seats[1].emitWithAck('lobby:resume', joined.session))).toEqual(views[1]);
       // An all-zero Fisher–Yates rotates the post-return deck one step left.
@@ -620,7 +632,8 @@ it.each([2, 3, 4, 5])('J à %i sièges : offre privée, déplacement et mélange
       expect(current.initialQuests!.seats[i]).toEqual({ type: 'kept', card: kept });
       expect(current.initialQuests!.seats.slice(i + 1)).toEqual(before.initialQuests!.seats.slice(i + 1));
       expect(current.game).toMatchObject({ phase: { type: 'setup' }, revision: i + 1 });
-      expect(isReadyForSetupK(current)).toBe(i === count - 1);
+      expect(isReadyForSetupK(current)).toBe(last);
+      expect(current).not.toHaveProperty('initialBets');
       for (const [j, view] of views.entries()) {
         const projected = viewFor(current, view.you);
         if (j > i) expect(projected).toEqual(view); // No revision, signal, or observable pending count change.
@@ -633,13 +646,23 @@ it.each([2, 3, 4, 5])('J à %i sièges : offre privée, déplacement et mélange
         .toEqual({ ok: false, error: 'conflict' });
       expect(await socket.emitWithAck('setup-quest:choose', { ...questAction(offers[i], 1 - i % 2), expectedRevision: 1 }))
         .toEqual({ ok: false, error: 'decision-unavailable' });
+      expect(await outsider.emitWithAck('setup-quest:choose', requests[i])).toEqual({ ok: false, error: 'unauthorized' });
+      expect(await outsider.emitWithAck('lobby:join', { code: created.session.code, name: 'Hors salon' })).toEqual({ ok: false, error: 'room-closed' });
       expect(databaseContents(db)).toEqual(persisted);
       expect(random).toHaveBeenCalledTimes(draws);
       // Drain each recipient connection before asserting absence of cross-seat messages.
-      await Promise.all([...seats, shadow].map((client) => client.emitWithAck('setup-quest:choose', { ...requests[i], expectedRevision: -1 })));
-      expect(updates.map((log) => log.mock.calls.map(([name]) => name))).toEqual([
-        ...seats.map((_, j) => j > i ? [] : ['setup-quest:update']), ['setup-quest:update'],
-      ]);
+      await Promise.all(allSockets.filter((client) => client.connected)
+        .map((client) => client.emitWithAck('setup-quest:choose', { ...requests[i], expectedRevision: -1 })));
+      const expectedCalls = [...seats.map((_, j) => j), 0, count - 1, -1].map((j) => {
+        if (j === -1 || (last && j === offlineSeat)) return [];
+        if (!last) return j === i ? [['setup-quest:update', authorView]] : [];
+        const original = views[j];
+        return [['lobby:update', { ...original, preparation: { ...original.preparation,
+          initialQuest: keptViews[j], initialBets: count === 2 ? [] : FACTION_IDS.slice(0, count).filter((_, k) => j !== k),
+        } }]];
+      });
+      expect(updates.map((log) => log.mock.calls)).toEqual(expectedCalls);
+      for (const log of updates) log.mockClear();
     }
     const all = read();
     expect([...all.initialQuests!.deck, ...all.initialQuests!.seats.flatMap((seat) => seat.type === 'kept' ? [seat.card] : neverOffer()),
@@ -649,10 +672,13 @@ it.each([2, 3, 4, 5])('J à %i sièges : offre privée, déplacement et mélange
     const dataVersion = db.prepare('PRAGMA data_version').get();
     await stop();
     const restoredUrl = await start(database, random);
-    for (const [i, session] of [created.session, joined.session].entries()) {
+    for (const [i, session] of sessions.entries()) {
       const socket = await connect(restoredUrl);
+      const log = vi.fn();
+      socket.onAny(log);
       expect(success(await socket.emitWithAck('lobby:resume', session))).toEqual(viewFor(all, views[i].you));
       expect(success(await socket.emitWithAck('setup-quest:choose', requests[i]))).toEqual(receipts[i]);
+      expect(log).not.toHaveBeenCalled();
     }
     expect(databaseContents(db)).toEqual(persisted);
     expect(db.prepare('PRAGMA data_version').get()).toEqual(dataVersion);
@@ -717,32 +743,49 @@ it('J refuse les intentions non autorisées et sérialise doublons, options riva
   } finally { db.close(); }
 });
 
-it('J annule écriture et reçu ensemble, sans diffusion du choix annulé', async () => {
+it('la reprise avant le dernier choix et son rollback gardent K fermé jusqu’au commit réussi', async () => {
   const database = tempDatabase();
   const random = vi.fn(() => 0);
-  const { host, guest, ready, created } = await readyTable(await start(database, random));
-  const { view } = await actionWithUpdates(host, [host, guest], launch(ready.revision));
+  const { host, guest, ready, sessions } = await readyTable(await start(database, random));
+  const { received: [hostView, guestView] } = await actionWithUpdates(host, [host, guest], launch(ready.revision));
+  const firstChoice = questAction(offerOf(hostView), 0);
+  const firstReceipt = success(await host.emitWithAck('setup-quest:choose', firstChoice));
+  const hostKept = success(await host.emitWithAck('lobby:resume', sessions[0]));
+  expect(hostKept.preparation).toMatchObject({ initialQuest: { type: 'kept' }, initialBets: null });
   const db = new DatabaseSync(database);
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
   const ownUpdates = vi.fn();
   const guestUpdates = vi.fn();
-  host.onAny(ownUpdates);
-  guest.onAny(guestUpdates);
   try {
     const before = databaseContents(db);
-    const choice = questAction(offerOf(view), 0);
+    const dataVersion = db.prepare('PRAGMA data_version').get();
+    await stop();
+    const restoredUrl = await start(database, random);
+    const [resumedHost, resumedGuest] = await Promise.all([connect(restoredUrl), connect(restoredUrl)]);
+    resumedHost.onAny(ownUpdates);
+    resumedGuest.onAny(guestUpdates);
+    expect(success(await resumedHost.emitWithAck('lobby:resume', sessions[0]))).toEqual(hostKept);
+    expect(success(await resumedGuest.emitWithAck('lobby:resume', sessions[1]))).toEqual(guestView);
+    expect(success(await resumedHost.emitWithAck('setup-quest:choose', firstChoice))).toEqual(firstReceipt);
+    expect(db.prepare('PRAGMA data_version').get()).toEqual(dataVersion);
+    const choice = questAction(offerOf(guestView), 0);
     db.exec(`CREATE TRIGGER reject_choice AFTER UPDATE ON lobbies
-      BEGIN SELECT RAISE(ABORT, 'rollback J'); END`);
-    expect(await host.emitWithAck('setup-quest:choose', choice)).toEqual({ ok: false, error: 'unavailable' });
-    expect(random).toHaveBeenCalledTimes(launchDraws(2) + 20);
+      BEGIN SELECT RAISE(ABORT, 'rollback du dernier choix J'); END`);
+    expect(await resumedGuest.emitWithAck('setup-quest:choose', choice)).toEqual({ ok: false, error: 'unavailable' });
+    expect(random).toHaveBeenCalledTimes(launchDraws(2) + 20 + 21);
     expect(databaseContents(db)).toEqual(before);
-    expect(success(await host.emitWithAck('lobby:resume', created.session))).toEqual(view);
+    expect(success(await resumedHost.emitWithAck('lobby:resume', sessions[0]))).toEqual(hostKept);
+    expect(success(await resumedGuest.emitWithAck('lobby:resume', sessions[1]))).toEqual(guestView);
     expect(ownUpdates).not.toHaveBeenCalled();
     expect(guestUpdates).not.toHaveBeenCalled();
     db.exec('DROP TRIGGER reject_choice');
-    expect(success(await host.emitWithAck('setup-quest:choose', choice)).revision).toBe(1);
-    expect(ownUpdates).toHaveBeenCalledTimes(1);
-    expect(guestUpdates).not.toHaveBeenCalled();
+    expect(success(await resumedGuest.emitWithAck('setup-quest:choose', choice)).revision).toBe(1);
+    expect(random).toHaveBeenCalledTimes(launchDraws(2) + 20 + 2 * 21);
+    for (const [i, socket] of [resumedHost, resumedGuest].entries()) {
+      const view = success(await socket.emitWithAck('lobby:resume', sessions[i]));
+      expect(view.preparation).toMatchObject({ initialQuest: { type: 'kept' }, initialBets: [] });
+      expect([ownUpdates, guestUpdates][i].mock.calls).toEqual([['lobby:update', view]]);
+    }
   } finally { log.mockRestore(); db.close(); }
 });
 

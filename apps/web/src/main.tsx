@@ -7,6 +7,7 @@ import { credentials, FACTION_NAMES, MAX_PLAYERS, MIN_PLAYERS, roomCode } from '
 import type { ClientEvents, ErrorCode, IndividualResourcesSetupView, InitialQuestView, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
 import { BoardPreview } from './BoardPreview.tsx';
 import { InitialQuest } from './InitialQuest.tsx';
+import { mergeLobbyView } from './merge-lobby-view.ts';
 import './styles.css';
 
 const messages: Record<ErrorCode, string> = {
@@ -141,15 +142,7 @@ function App() {
   const preparing = Boolean(preparation);
 
   function receive(next: LobbyView) {
-    setView((previous) => {
-      if (previous?.code !== next.code) return next;
-      if (previous.revision > next.revision) return previous;
-      const current = previous.preparation?.initialQuest;
-      if (current && next.preparation?.gameId === current.gameId && current.revision > next.preparation.initialQuest.revision) {
-        return { ...next, preparation: { ...next.preparation, initialQuest: current } };
-      }
-      return next;
-    });
+    setView((previous) => mergeLobbyView(previous, next));
   }
 
   useEffect(() => {
@@ -313,6 +306,14 @@ function App() {
           </tr>)}</tbody>
         </table>
         <InitialQuest quest={preparation.initialQuest} disabled={disabled} choose={chooseQuest} />
+        <div aria-live="polite">
+          {preparation.initialBets !== null && <section className="panel" aria-labelledby="initial-bets">
+            <h3 id="initial-bets">Vos cartes Pari</h3>
+            {preparation.initialBets.length === 0 ? <p>Aucune carte Pari à deux joueurs.</p>
+              : <ul>{preparation.initialBets.map((faction) => <li key={faction}>{FACTION_NAMES[faction]}</li>)}</ul>}
+            <p>Les Paris ne se jouent pas pendant la préparation.</p>
+          </section>}
+        </div>
         <IndividualResources players={view.players} resources={preparation.individualResources} />
         <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores}
           twoPlayerSetup={preparation.twoPlayerSetup} firstBattle={preparation.firstBattle} />

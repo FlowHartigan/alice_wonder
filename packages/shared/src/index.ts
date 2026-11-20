@@ -208,6 +208,8 @@ export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 
     individualResources: IndividualResourcesSetupView;
     firstBattle: FirstBattleSetupView;
     initialQuest: InitialQuestView;
+    /** null until J is complete; [] is the available hand at 2J. */
+    initialBets: FactionId[] | null;
   } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
 };

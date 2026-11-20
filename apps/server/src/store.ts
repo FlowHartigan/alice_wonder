@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { createLobby, joinLobby, applyLobbyAction, chooseInitialQuest, initialQuestFor, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, migrateLobbyV5, migrateLobbyV6, migrateLobbyV7, migrateLobbyV8 } from '@wonderland/game-engine';
+import { createLobby, joinLobby, applyLobbyAction, chooseInitialQuest, initialQuestFor, isReadyForSetupK, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, migrateLobbyV5, migrateLobbyV6, migrateLobbyV7, migrateLobbyV8 } from '@wonderland/game-engine';
 import type { RandomSource } from '@wonderland/game-engine';
 import { lobbySnapshotV5, lobbySnapshotV4, lobbyStateV1, lobbyStateV2, lobbyStateV3 } from '@wonderland/shared';
 import type { GameAction, GameReceipt, InitialQuestView, LobbyAction, Reply, Session } from '@wonderland/shared';
@@ -163,7 +163,8 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       const playerId = String(row.player_id);
       if (state?.players.some(({ id }) => id === playerId)) return { state, playerId };
     },
-    chooseQuest(seat: Seat, action: GameAction): Reply<{ receipt: GameReceipt; update?: InitialQuestView }> {
+    chooseQuest(seat: Seat, action: GameAction): Reply<{ receipt: GameReceipt; publication?:
+      { type: 'quest'; view: InitialQuestView } | { type: 'bets-ready'; state: LobbyState } }> {
       return transaction(() => {
         const state = load(seat.code);
         if (!state) return { ok: false, error: 'room-not-found' };
@@ -172,7 +173,11 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
         const { receipt } = result;
         if (!result.changed) return { ok: true, value: { receipt } };
         save(result.state); // Movement and accepted private intent/receipt commit together.
-        return { ok: true, value: { receipt, update: initialQuestFor(result.state, seat.playerId) } };
+        // Only a newly accepted choice can complete J. The caller publishes after COMMIT.
+        const publication = isReadyForSetupK(result.state)
+          ? { type: 'bets-ready', state: result.state } as const
+          : { type: 'quest', view: initialQuestFor(result.state, seat.playerId)! } as const;
+        return { ok: true, value: { receipt, publication } };
       });
     },
     action(seat: Seat, action: LobbyAction): Reply<{ state: LobbyState; changed: boolean }> {

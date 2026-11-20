@@ -6,6 +6,7 @@ import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-reg
 import { firstTeaForSetup, initializeGame, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
 import { distributeInitialResources, projectInitialResources } from './initial-resources.ts';
+import { initialBetsFor } from './initial-bets.ts';
 import { assignRegionScoreMarkers } from './region-score-markers.ts';
 import { dealInitialQuests, initialQuestFor, questSupply, shuffleSetupQuestIds } from './initial-quests.ts';
 
@@ -194,6 +195,7 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
       firstTeaPreview,
       individualResources: projectInitialResources(individualResources),
       initialQuest,
+      initialBets: initialBetsFor(state, playerId),
       firstBattle: firstBattleForSetup(admittedGame.playerIds.length, firstBattleRoll.result, excluded),
       twoPlayerSetup: revealed && excluded ? {
         revealedQuestTitle: revealed.title,

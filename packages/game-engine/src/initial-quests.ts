@@ -66,7 +66,7 @@ export function chooseInitialQuest(state: LobbyState, actorId: string, raw: unkn
   } as const;
 }
 
-/** Gate for the future transition K; completing J does not execute it or publish a status. */
+/** K becomes available only when all initial Quests are kept. */
 export function isReadyForSetupK({ game, initialQuests }: LobbyState): boolean {
   return game?.phase.type === 'setup' && initialQuests?.seats.every((seat) => seat.type === 'kept') === true;
 }

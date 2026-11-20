@@ -81,11 +81,13 @@ La fiche commerciale agrège « 254 pions » sans ventilation et classe les 24 c
 
 **Dotation web [#73](https://github.com/FlowHartigan/alice_wonder/issues/73) — Validée pour la face et la réserve de Poison de l'étape A (p. 5 A, p. 21 étape 5).** À partir des sièges et des factions figés, le serveur enregistre la face et attribue les jetons Poison au seul Jabberwocky, en réserve personnelle et jamais dans le sac. Le Poison non attribué est hors jeu et n'est pas instancié. La vue en `setup` remplace l'aperçu #71 ; elle ne présente pas les plateaux imprimés ni les pouvoirs.
 
+**Cartes Pari :** le nombre du lot ci-dessus est celui de la prise à A. Le web n'affiche que la [main résultant de K](#cartes-pari-en-préparation-k), déterminée à partir des factions figées selon l'arbitrage #76.
+
 **Contrôle :** choisir deux factions distinctes dont le Jabberwocky ; vérifier les faces 2J, les silhouettes et les quatre emplacements couverts. Refaire à 5J avec les cinq factions, sans emprunt à une autre faction.
 
 ### WW-SETUP-003 — Ressources individuelles et Quêtes
 
-**Statut : Validée pour les ressources et opérations établies de B à M.** Sources : livret p. 3, 5 B–M, 21. Aucun ordre entre joueurs n'est prescrit pour l'étape J ; la composition exacte des mains de Pari après K à 3–4J reste non validée.
+**Statut : Validée pour les ressources et opérations établies de B à M.** Sources : livret p. 3, 5 B–M, 21. Aucun ordre entre joueurs n'est prescrit pour l'étape J ; la composition exacte des mains de Pari après K à 3–4J est arbitrée pour le web seulement.
 
 1. **B–D — Réserves et Forge.** Poser les 14 Partisans et les 5 Châteaux en réserve personnelle. Transférer 4 Partisans sur les cases indiquées de la 3e piste de Forge (10 restent en réserve), puis poser 4 des 6 Artefacts sur les emplacements de récompense des pistes de Forge.
 2. **E — Capacités et Force du Chef.** Couvrir les 4 capacités de Faction avec 4 disques et placer le cinquième sur Force du Chef **1**.
@@ -94,7 +96,7 @@ La fiche commerciale agrège « 254 pions » sans ventilation et classe les 24 c
 5. **H — Score.** Placer le dernier disque sur Score **0**.
 6. **I — Combat.** Placer le cube de Faction sur Combat **0**.
 7. **J — Quête.** Chaque joueur pioche 2 Quêtes, en garde 1 face cachée dans son journal et remet l'autre dans le paquet Quête avant de le remélanger. À 2J, la pioche a déjà été filtrée à l'étape 11 (p. 4 et 21). Les pièces posées et les Éclats distribués en N sont visibles, pas la Quête conservée par un autre joueur.
-8. **K — Paris.** Ranger les cartes Pari des factions inutilisées ; à 2J, toutes restent hors jeu. Ne pas confondre les quatre cartes prises à l'étape A avec les cibles de Pari utilisables après K : à 3–4J, le texte ne distingue pas explicitement les lots des factions absentes des cartes qui les représentent dans les lots distribués. Un Pari ne vise qu'une faction qui combat (p. 12).
+8. **K — Paris.** Ranger les cartes Pari des factions inutilisées (p. 5 K) ; à 2J, toutes restent hors jeu (p. 21). Les quatre cartes prises par siège à 3–5J (p. 5 A, `WW-SETUP-002`) ne sont pas un décompte après K : à 3–4J, le texte ne précise pas si le rangement concerne aussi les cartes représentant les factions absentes dans les lots distribués. En combat, un Pari ne vise qu'une faction qui combat (p. 12) : cette restriction ne fixe pas la composition de la main (`WW-WAR-009`).
 9. **L — Aides.** Poser face visible la carte Référence Alliés de la série en jeu, ranger l'autre et poser la carte Référence des phases à côté.
 10. **M — Chefs.** Placer les silhouettes Chef en Bout de Table, pas dans les Régions. Passer ensuite à l'étape N (`WW-SETUP-005`).
 
@@ -102,7 +104,11 @@ La fiche commerciale agrège « 254 pions » sans ventilation et classe les 24 c
 
 **Quête initiale web [#14](https://github.com/FlowHartigan/alice_wonder/issues/14) — Validée pour J et la confidentialité.** [Livret FR `LKY WWR-R01-FR`](https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416) p. 5 J (deux cartes, une au journal face cachée, l'autre remise avant mélange), p. 14 « Quêtes » (journal caché jusqu'à révélation en jeu), p. 4 étapes 10–11 et p. 21 « Mise en place » 1–3 (mélange et retrait à 2J). [Arbitrage du propriétaire](https://github.com/FlowHartigan/alice_wonder/issues/14#issuecomment-7044152358) : la distribution est simultanée au lancement après A–I, deux cartes consécutives du dessus par siège dans l'ordre d'admission figé, indépendamment de J1 et de la connexion. À chaque choix irrévocable, la carte non retenue revient dans la pioche courante, remélangée immédiatement ; les autres offres ne changent pas. Seul le propriétaire voit ses offres puis sa Quête au journal privé. Voir la [recette de test](docs/rules-coverage.md#recette-des-quêtes-initiales-privées).
 
-**Limite J / K–N :** toutes les Quêtes choisies rendent la préparation prête pour K, sans exécuter K et sans signal public. Aucun Pari, aide, silhouette en Bout de Table, crédit d'Éclats, calcul de Quête ou transition hors de `setup`. Les aperçus du premier Thé et des Éclats (#63) restent inchangés ; #10, #12 et #13 restent ouvertes.
+#### Cartes Pari en préparation (K)
+
+**Arbitrage web « Adversaires présents » ([#76](https://github.com/FlowHartigan/alice_wonder/issues/76)), pas une clarification du livret FR.** Après sauvegarde du dernier choix privé de J, chaque siège admis reçoit la vue de sa seule main : aucune carte à 2J, sinon une par autre faction admise (2, 3 ou 4 cartes à 3, 4 ou 5J). La composition suit le roster figé, indépendamment de J1 et des connexions. Avant cela, aucun signal collectif ; à la fin de J, seule la disponibilité commune et la main propre au siège s'ajoutent, sans identité du dernier joueur ni progression individuelle. La révélation régionale 2J reste visible aux admis.
+
+**Limites :** aucune carte n'est jouable en `setup`. L'éligibilité des cibles et la résolution en combat restent suivies en [#21](https://github.com/FlowHartigan/alice_wonder/issues/21). Ni L–N, ni ouverture du Thé, ni crédit d'Éclats ou calcul de Quête ; les aperçus de #63 restent inchangés. #10, #12 et #13 restent ouvertes. Voir la [recette K](docs/rules-coverage.md#recette-des-cartes-pari-en-préparation).
 
 **Contrôle :** suivre l'ordre F–M de la p. 5 avant de passer à N. Décompter les sacs, pistes et réserves pour les quatre effectifs, avec puis sans Jabberwocky quand c'est possible. Suivre une Quête refusée jusque dans la pioche et vérifier que seul le propriétaire voit celle qu'il garde.
 
@@ -200,7 +206,7 @@ Tableau relevé **visuellement** en bas à droite de la p. 5 du PDF FR : chaque 
 
 **WW-WAR-008** — À vérifier, p. 14–15. Ordre indiqué : conquête/Château, Quêtes, capacités de fin, Forge, Paris, conclusion. Épuiser les Actifs restants, remettre les repères de Force au départ, laisser la Folie sur sa piste, continuer vers la Région suivante.
 
-**WW-WAR-009** — À vérifier, p. 12, 14–15 et 21. À 3–5, après détermination de la Force de départ d'un combat disputé, les non-participants peuvent miser simultanément et en secret sur le vainqueur. Réussite : un Allié faible choisi ; erreur : un Éclat ; égalité en tête : ni gain ni pénalité. Vérifier la résolution des paris si tous les combattants échouent.
+**WW-WAR-009** — À vérifier, p. 12, 14–15 et 21. À 3–5, après détermination de la Force de départ d'un combat disputé, les non-participants peuvent miser simultanément et en secret sur le vainqueur ; seule une faction qui combat est une cible admissible (p. 12). Réussite : un Allié faible choisi ; erreur : un Éclat ; égalité en tête : ni gain ni pénalité. Vérifier la résolution des paris si tous les combattants échouent. Cette éligibilité et la résolution relèvent de [#21](https://github.com/FlowHartigan/alice_wonder/issues/21), pas de la dotation K.
 
 ### WW-WAR-004 — Arrêt des pioches à 2J
 
@@ -330,6 +336,8 @@ Source et tests : ...
 
 **Contrôle de préparation :** avec le Donjon rouge révélé et un dé de 2, partir de la Forêt de Tulgey et finir à la Mare de Larmes ; après le Comté, le circuit reprend à la Forêt. Vérifier le résultat des exclusions au marché et dans les Quêtes, les faces 2J, le cube distinct, les 11 jetons par sac et l'absence de cartes Pari. Le relevé des cinq faces et le nombre de Quêtes à retirer par Région nécessitent un catalogue FR ; l'adjacence pour les effets hors circuit des combats n'est pas déduite du saut de Région.
 
+**Web K ([#76](https://github.com/FlowHartigan/alice_wonder/issues/76)) :** la main est vide à 2J (p. 21), mais sa disponibilité ne s'affiche qu'après le dernier choix de J, comme aux autres effectifs.
+
 #### Retrait régional initial au moteur (2J)
 
 **Règle validée, données FR encore à vérifier.** Livret de base FR `LKY WWR-R01-FR` p. 2–3 (30 Quêtes), p. 4 étapes 10–11 (`WW-SETUP-004`) et p. 21 étapes 1–3 (`WW-COUNT-001`, `WW-MAP-004`). `resolveTwoPlayerRegionSetup` prend deux données internes, jamais une charge utile client :
@@ -365,7 +373,8 @@ Sur les 13 chaises du plateau, bloquer celles indiquées ci-dessous. Les chiffre
 | Régions actives / marqueurs Score hors plateau | 4 / 2 | 5 / 1 | 5 / 1 | 5 / 1 |
 | Pays des Merveilles visibles / en pioche | 3 / 19 | 3 / 21 | 3 / 21 | 3 / 21 |
 | Quêtes dans les journaux / en pioche | 2 / 28 − R | 3 / 27 | 4 / 26 | 5 / 25 |
-| Cartes Pari prises à l'étape A / non distribuées à cette étape | 0 / 20 | 12 / 8 | 16 / 4 | 20 / 0 |
+| Cartes Pari prises à l'étape A / non distribuées à cette étape (livret FR) | 0 / 20 | 12 / 8 | 16 / 4 | 20 / 0 |
+| Cartes Pari par siège après K (convention web #76) | 0 | 2 | 3 | 4 |
 | Sacs × jetons par sac | 2 × 11 | 3 × 10 | 4 × 10 | 5 × 10 |
 | Forge en réserve commune | 21 | 22 | 21 | 20 |
 | Folie simple non distribuée | 25 | 23 | 21 | 19 |
@@ -373,7 +382,7 @@ Sur les 13 chaises du plateau, bloquer celles indiquées ci-dessous. Les chiffre
 | Poison si Jabberwocky choisi : en réserve personnelle / hors jeu | 4 / 3 | 5 / 2 | 6 / 1 | 7 / 0 |
 | Éclats de départ (total distribué / réserve en valeur) | 3 / 77 | 6 / 74 | 8 / 72 | 8 / 72 |
 
-`R` est le nombre de Quêtes de la Région retirée, carte révélée comprise ; le livret ne donne pas `R` par Région. La ligne des Paris compte les cartes prises à A, pas les mains après K. Les Folie doubles non distribuées sont des restes d'inventaire, pas un gain de fin de Thé validé : p. 4 place la Folie sans distinguer les types, et les illustrations p. 7 montrent des simples. À 3–5, pas de Région ni de carte Pays des Merveilles à retirer, ni de cube de Résistance. Hors préparation : 4 cartes Thé avant de placer le Chef (p. 7) et pas de pioche ni de Pari en combat incontesté (p. 14). Aucun autre écart de préparation entre 3, 4 et 5 n'a été identifié dans les pages consultées.
+`R` est le nombre de Quêtes de la Région retirée, carte révélée comprise ; le livret ne donne pas `R` par Région. Les mains web après K ne doivent pas être assimilées au décompte matériel de l'étape A ou aux cibles légales en combat. Les Folie doubles non distribuées sont des restes d'inventaire, pas un gain de fin de Thé validé : p. 4 place la Folie sans distinguer les types, et les illustrations p. 7 montrent des simples. À 3–5, pas de Région ni de carte Pays des Merveilles à retirer, ni de cube de Résistance. Hors préparation : 4 cartes Thé avant de placer le Chef (p. 7) et pas de pioche ni de Pari en combat incontesté (p. 14). Aucun autre écart de préparation entre 3, 4 et 5 n'a été identifié dans les pages consultées.
 
 **Contrôle :** refaire la préparation avec la même série A à 3, 4 puis 5 : retirer un bloqueur à chaque incrément, ajouter une carte Thé I visible, conserver 5 Régions et le même sac par personne. Vérifier séparément les trois lignes d'Éclats et le Poison de 5 à 7.
 
