@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
-import { applyGameAction, firstTeaForSetup, individualResourcesForSetup, initializeGame, privatePlayerView, publicGameView, shuffle, teaTableForSetup } from '@wonderland/game-engine';
+import { applyGameAction, createLobby, firstTeaForSetup, initializeGame, launchPreparation, privatePlayerView, publicGameView, shuffle, teaTableForSetup } from '@wonderland/game-engine';
 import { FACTION_IDS, gameState } from '@wonderland/shared';
+import { lobbyState, STARTING_TOKEN_TYPES, startingSeatResources } from '@wonderland/shared/lobby-storage';
 import type { GameAction, GamePhase, GameState } from '@wonderland/shared';
 
 const id = (n: number) => `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -87,36 +88,49 @@ it.each([
   { count: 2, poison: 0, boardFace: 'golden-two-player', bagTokenCount: 11 },
   { count: 3, poison: 0, boardFace: 'ordinary', bagTokenCount: 10 },
   { count: 4, poison: 0, boardFace: 'ordinary', bagTokenCount: 10 },
-])('WW-SETUP-002/003 : ressources prévues à $count sièges (Poison : $poison)', ({ count, poison, boardFace, bagTokenCount }) => {
+])('WW-SETUP-002/003 : dotation exacte à $count sièges (Poison : $poison)', ({ count, poison, boardFace, bagTokenCount }) => {
   const otherFactions = FACTION_IDS.filter((faction) => faction !== 'jabberwocky');
   const factions = poison ? ['jabberwocky' as const, ...otherFactions].slice(0, count) : otherFactions.slice(0, count);
-  const seats = factions.map((faction, i) => Object.freeze({ id: id(i + 2), faction }));
-  const game = initializeGame(gameId, seats.map(({ id }) => id));
-  Object.freeze(game.playerIds);
-  Object.freeze(game.phase);
-  Object.freeze(game);
-  // A faction outside the frozen seats doesn't add a line or affect the count.
-  const unused = FACTION_IDS.find((faction) => !factions.includes(faction));
-  const roster = Object.freeze([...(unused ? [{ id: id(99), faction: unused }] : []), ...seats.toReversed()]);
-  const preview = () => individualResourcesForSetup(game, roster);
-  expect(preview()).toStrictEqual(seats.map(({ id: playerId, faction }) => ({
-    playerId, faction, boardFace, bagTokenCount, poisonInReserve: faction === 'jabberwocky' ? poison : 0,
-    supportersInReserve: 10, supportersOnThirdForgeTrack: 4, castlesInReserve: 5,
-    artifactsOnForge: 4, coveredAbilities: 4, leaderStrength: 1, shield: 'intact', victoryPoints: 0, combat: 0,
-  })));
-  expect(preview()).toEqual(preview());
-});
-
-it('WW-SETUP-002/003 : aucun aperçu hors setup ou sans les factions des sièges figés', () => {
-  const game = initializeGame(gameId, [firstPlayer, secondPlayer]);
-  const firstSeat = { id: firstPlayer, faction: 'alice' } as const;
-  const seats = [firstSeat, { id: secondPlayer, faction: 'chapelier-fou' } as const];
-  for (const phase of [tea, { type: 'war', round: 1 } as const]) {
-    expect(individualResourcesForSetup({ ...game, phase }, seats)).toBeNull();
+  const players = factions.map((faction, i) => Object.freeze({ id: id(i + 2), name: `Siège ${i + 1}`, faction, ready: true }));
+  const state = { ...createLobby('ABCDEF12', players[0]), players, firstPlayerId: players.at(-1)!.id };
+  const run = (random: () => number) => {
+    const result = launchPreparation(state, state.hostId, state.revision, () => gameId, random);
+    if (!result.ok) throw new Error(result.error);
+    return lobbyState.parse(result.value);
+  };
+  const launched = run(() => 0);
+  expect(run(() => 0)).toEqual(launched);
+  expect(state.individualResources).toBeNull();
+  expect(launched.game).toEqual(initializeGame(gameId, players.map(({ id }) => id)));
+  const allIds: string[] = [];
+  for (const [i, seat] of launched.individualResources!.entries()) {
+    const { tokenZones, ...holdings } = seat;
+    const { id: playerId, faction } = players[i];
+    expect(holdings).toEqual({
+      playerId, faction, boardFace, supportersInReserve: 10, supportersOnThirdForgeTrack: 4, castlesInReserve: 5,
+      coveredAbilities: 4, leaderStrength: 1, shield: 'intact', victoryPoints: 0, combat: 0,
+    });
+    const { bag, forgeRewards, poisonReserve, active, exhausted, madnessTrack } = tokenZones;
+    expect(bag).toHaveLength(bagTokenCount);
+    expect(bag.map(({ type }) => type).sort()).toEqual([
+      'artifact-3', 'artifact-3', ...(count === 2 ? ['forge-1'] : []), 'forge-1',
+      'leader-1', 'leader-1', 'leader-1', 'leader-2', 'madness-double', 'madness-single', 'madness-single',
+    ]);
+    expect(forgeRewards.map(({ type }) => type)).toEqual(Array(4).fill('artifact-3'));
+    expect(poisonReserve.map(({ type }) => type)).toEqual(Array(faction === 'jabberwocky' ? poison : 0).fill('poison'));
+    expect([active, exhausted, madnessTrack]).toEqual([[], [], []]);
+    const originalBag = startingSeatResources(playerId, faction, count).tokenZones.bag;
+    expect(bag).toEqual([...originalBag.slice(1), originalBag[0]]);
+    for (const zone of Object.values(tokenZones)) allIds.push(...zone.map(({ id }) => id));
   }
-  expect(individualResourcesForSetup({ ...game, playerIds: [firstPlayer] }, seats)).toBeNull();
-  expect(individualResourcesForSetup(game, [firstSeat])).toBeNull();
-  expect(individualResourcesForSetup(game, [firstSeat, { id: secondPlayer, faction: null }])).toBeNull();
+  expect(new Set(allIds).size).toBe(allIds.length);
+  expect(STARTING_TOKEN_TYPES).toEqual({
+    'leader-1': { kind: 'leader', strength: 1 }, 'leader-2': { kind: 'leader', strength: 2 },
+    'artifact-3': { kind: 'artifact', strength: 3 }, 'forge-1': { kind: 'forge', strength: 1 },
+    'madness-single': { kind: 'madness', level: 'single' }, 'madness-double': { kind: 'madness', level: 'double' },
+    poison: { kind: 'poison' },
+  });
+  expect(run(() => 0.99).individualResources![0].tokenZones.bag).not.toEqual(launched.individualResources![0].tokenZones.bag);
 });
 
 it('rejoue les mêmes intentions et événements à partir du même hasard injecté', () => {

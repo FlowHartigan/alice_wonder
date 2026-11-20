@@ -13,7 +13,7 @@ const previewTitle = 'Aperçu du plateau — lecture seule';
 const teaSummary = 'Table du Thé : 11 chaises ouvertes. Chaises 4J et 5J bloquées. Aucune carte n’est installée.';
 const scoreCaption = 'Marqueurs Score de Région — attribution initiale';
 const firstTeaCaption = 'Aperçu — ordre prévu du premier Thé et Éclats de départ';
-const resourcesTitle = 'Aperçu des ressources individuelles de départ';
+const resourcesTitle = 'Dotation individuelle de départ';
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
 const reveal = 'Quête révélée : Remporter le croquet du Jardin. Région hors jeu : Jardin des Fleurs vivantes.';
 const excluded = 'jardin-des-fleurs-vivantes';
@@ -67,26 +67,26 @@ async function checkFirstTea(player: Page, expected: [string, string][]) {
 }
 
 async function checkIndividualResources(player: Page, expected: [string, number][]) {
-  const preview = player.getByRole('region', { name: resourcesTitle });
-  await expect(preview).toBeVisible();
-  await expect(preview).toHaveAccessibleDescription('Lecture seule : ces ressources sont prévues, pas encore attribuées.');
-  await expect(preview.getByRole('heading', { level: 4 })).toHaveText(expected.map(([label]) => label));
+  const panel = player.getByRole('region', { name: resourcesTitle });
+  await expect(panel).toBeVisible();
+  await expect(panel).toHaveAccessibleDescription('Ressources attribuées en préparation (étapes A à I), en lecture seule. Pour chaque sac, seul le nombre de jetons est visible.');
+  await expect(panel.getByRole('heading', { level: 4 })).toHaveText(expected.map(([label]) => label));
   const twoPlayers = expected.length === 2;
   for (const [name, poison] of expected) {
-    const card = preview.getByRole('article', { name, exact: true });
+    const card = panel.getByRole('article', { name, exact: true });
     await expect(card.getByRole('term')).toHaveText([
       'Plateau de faction', 'Partisans en réserve', 'Partisans sur la troisième piste de Forge', 'Châteaux en réserve',
       'Artefacts sur la Forge', 'Capacités couvertes', 'Force du Chef', 'Bouclier', 'Points de victoire (PV)',
-      'Piste de Combat', 'Jetons prévus dans le sac', 'Jetons Poison en réserve',
+      'Piste de Combat', 'Jetons dans le sac', 'Jetons Poison en réserve', 'Jetons actifs', 'Jetons épuisés', 'Jetons sur la piste de Folie',
     ]);
     await expect(card.getByRole('definition')).toHaveText([
       twoPlayers ? 'Face dorée « 2 JOUEURS »' : 'Face ordinaire', '10', '4', '5', '4', '4', '1', 'Intact', '0', '0',
-      twoPlayers ? '11' : '10', String(poison),
+      twoPlayers ? '11' : '10', String(poison), '0', '0', '0',
     ]);
   }
-  await expect(preview.locator('a, button, input, select, textarea, img, [tabindex]')).toHaveCount(0);
-  await expect(preview.getByText(/Éclats|premier Thé|Quête/)).toHaveCount(0);
-  expect(await preview.evaluate((panel) => panel.scrollWidth <= panel.clientWidth)).toBe(true);
+  await expect(panel.locator('a, button, input, select, textarea, img, [tabindex]')).toHaveCount(0);
+  await expect(panel.getByText(/Éclats|premier Thé|Quête/)).toHaveCount(0);
+  expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 }
 
 async function checkScores(player: Page, { twoPlayers, imageLoaded = true }: { twoPlayers: boolean; imageLoaded?: boolean }) {
@@ -161,7 +161,7 @@ async function checkBoard(player: Page) {
 test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la retrouvent', async ({ page }) => {
   let draws = 0;
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
-    random: () => ++draws === 35 ? 0.5 : 0 });
+    random: () => ++draws === 35 ? 0.5 : 0 }); // Le dé suit les marqueurs et les Quêtes, avant les sacs.
   const listening = once(server.http, 'listening');
   server.http.listen(0, '127.0.0.1');
   try {
@@ -323,7 +323,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(newcomer.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
       await expect(newcomer.getByText(/Quête révélée|Région hors jeu|Premier combat|Dé Éclat/)).toHaveCount(0);
-      expect(draws).toBe(35);
+      expect(draws).toBe(35 + 2 * 10); // Préparation commune, puis 10 échanges par sac de 11 jetons.
     } finally {
       await otherBrowser.close();
     }
@@ -335,7 +335,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
 for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : aperçus de préparation partagés`, async ({ page }) => {
   let draws = 0;
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
-    random: () => ++draws === 6 ? 0.5 : 0 });
+    random: () => ++draws === 6 ? 0.5 : 0 }); // Sans retrait régional, le dé suit les marqueurs, avant les sacs.
   const clients: Socket<ServerEvents, ClientEvents>[] = [];
   const guests: { session: Session; id: string }[] = [];
   const preparedViews = new Map<string, LobbyView>();
@@ -403,7 +403,19 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
       .map((playerId, i) => ({ playerId, turn: i + 1, plannedShards: shards[i] })));
     expect(shared?.twoPlayerSetup).toBeNull();
     expect(shared?.firstBattle).toEqual({ dieResult: 2, region: { id: garden.id, name: garden.name } });
-    for (const { id } of guests) expect(preparedViews.get(id)?.preparation).toEqual(shared);
+    // Liste exacte : les zones de jetons ne livrent que des nombres, même au propriétaire du sac.
+    const expectedResources = [hostId, ...guests.map(({ id }) => id)].map((playerId, i) => ({
+      playerId, faction: FACTION_IDS[i], boardFace: 'ordinary',
+      supportersInReserve: 10, supportersOnThirdForgeTrack: 4, castlesInReserve: 5,
+      artifactsOnForge: 4, coveredAbilities: 4, leaderStrength: 1, shield: 'intact',
+      victoryPoints: 0, combat: 0, bagTokenCount: 10, poisonInReserve: resources[i][1],
+      activeTokenCount: 0, exhaustedTokenCount: 0, madnessTrackTokenCount: 0,
+    }));
+    for (const { id } of guests) {
+      const preparation = preparedViews.get(id)?.preparation;
+      expect(preparation).toEqual(shared);
+      expect(preparation?.individualResources).toStrictEqual(expectedResources);
+    }
 
     clients[1].disconnect();
     await page.reload();
@@ -412,8 +424,10 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await checkFirstBattle(page, garden);
     const returned: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
     clients.push(returned);
-    expect(success(await returned.emitWithAck('lobby:resume', secondGuest.session)).preparation).toEqual(shared);
-    expect(draws).toBe(6);
+    const resumed = success(await returned.emitWithAck('lobby:resume', secondGuest.session)).preparation;
+    expect(resumed).toEqual(shared);
+    expect(resumed?.individualResources).toStrictEqual(expectedResources);
+    expect(draws).toBe(6 + count * 9); // Préparation commune, puis 9 échanges par sac de 10 jetons.
   } finally {
     for (const client of clients) client.disconnect();
     await server.close();

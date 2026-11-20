@@ -1,5 +1,5 @@
 import { gameAction, gameState, MAX_PLAYERS, MIN_PLAYERS } from '@wonderland/shared';
-import type { FactionId, FirstTeaSetupView, GamePhase, GameState, IndividualResourcesSetupView, PrivateGameEvent, PrivatePlayerView, PublicGameView, TeaTableSetupView } from '@wonderland/shared';
+import type { FirstTeaSetupView, GamePhase, GameState, PrivateGameEvent, PrivatePlayerView, PublicGameView, TeaTableSetupView } from '@wonderland/shared';
 
 /** Server context resolved from an authenticated session, never from the command. */
 export type GameSeat = Readonly<{ gameId: string; playerId: string }>;
@@ -42,29 +42,6 @@ export function firstTeaForSetup(
   return STARTING_SHARDS[count].map((plannedShards, index) => ({
     playerId: playerIds[(start + index) % count], turn: index + 1, plannedShards,
   }));
-}
-
-/** WW-SETUP-002/003 — livret FR p. 5 A–I et p. 21. Uses the validated frozen roster and factions. */
-export function individualResourcesForSetup(
-  game: Readonly<{ phase: GamePhase; playerIds: readonly string[] }>,
-  seats: readonly Readonly<{ id: string; faction: FactionId | null }>[],
-): IndividualResourcesSetupView | null {
-  const count = game.playerIds.length;
-  if (game.phase.type !== 'setup' || count < MIN_PLAYERS || count > MAX_PLAYERS) return null;
-  const twoPlayers = count === 2;
-  const preview: IndividualResourcesSetupView = [];
-  for (const playerId of game.playerIds) {
-    const faction = seats.find(({ id }) => id === playerId)?.faction;
-    if (!faction) return null;
-    preview.push({
-      playerId, faction, boardFace: twoPlayers ? 'golden-two-player' : 'ordinary',
-      supportersInReserve: 10, supportersOnThirdForgeTrack: 4, castlesInReserve: 5,
-      artifactsOnForge: 4, coveredAbilities: 4, leaderStrength: 1, shield: 'intact',
-      victoryPoints: 0, combat: 0, bagTokenCount: twoPlayers ? 11 : 10,
-      poisonInReserve: faction === 'jabberwocky' ? count + 2 : 0,
-    });
-  }
-  return preview;
 }
 
 // In a validated snapshot, exact membership also rejects non-canonical session IDs.

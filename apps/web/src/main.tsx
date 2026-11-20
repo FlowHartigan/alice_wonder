@@ -64,12 +64,12 @@ function seatLabel(players: LobbyView['players'], index: number) {
 const boardFaceLabels = { ordinary: 'Face ordinaire', 'golden-two-player': 'Face dorée « 2 JOUEURS »' };
 const shieldLabels = { intact: 'Intact' };
 
-function IndividualResourcesPreview({ players, preview }: { players: LobbyView['players']; preview: IndividualResourcesSetupView }) {
-  return <section className="resources-preview" aria-labelledby="resources-title" aria-describedby="resources-note">
-    <h3 id="resources-title">Aperçu des ressources individuelles de départ</h3>
-    <p id="resources-note">Lecture seule : ces ressources sont prévues, pas encore attribuées.</p>
+function IndividualResources({ players, resources }: { players: LobbyView['players']; resources: IndividualResourcesSetupView }) {
+  return <section className="individual-resources" aria-labelledby="resources-title" aria-describedby="resources-note">
+    <h3 id="resources-title">Dotation individuelle de départ</h3>
+    <p id="resources-note">Ressources attribuées en préparation (étapes A à I), en lecture seule. Pour chaque sac, seul le nombre de jetons est visible.</p>
     <div className="resources-grid">
-      {preview.map((seat) => {
+      {resources.map((seat) => {
         const titleId = `resources-${seat.playerId}`;
         return <article key={seat.playerId} aria-labelledby={titleId}>
           <h4 id={titleId}>{seatLabel(players, players.findIndex(({ id }) => id === seat.playerId))} — {FACTION_NAMES[seat.faction]}</h4>
@@ -84,8 +84,11 @@ function IndividualResourcesPreview({ players, preview }: { players: LobbyView['
             <dt>Bouclier</dt><dd>{shieldLabels[seat.shield]}</dd>
             <dt>Points de victoire (PV)</dt><dd>{seat.victoryPoints}</dd>
             <dt>Piste de Combat</dt><dd>{seat.combat}</dd>
-            <dt>Jetons prévus dans le sac</dt><dd>{seat.bagTokenCount}</dd>
+            <dt>Jetons dans le sac</dt><dd>{seat.bagTokenCount}</dd>
             <dt>Jetons Poison en réserve</dt><dd>{seat.poisonInReserve}</dd>
+            <dt>Jetons actifs</dt><dd>{seat.activeTokenCount}</dd>
+            <dt>Jetons épuisés</dt><dd>{seat.exhaustedTokenCount}</dd>
+            <dt>Jetons sur la piste de Folie</dt><dd>{seat.madnessTrackTokenCount}</dd>
           </dl>
         </article>;
       })}
@@ -279,7 +282,7 @@ function App() {
             <td>{plannedShards}</td>
           </tr>)}</tbody>
         </table>
-        <IndividualResourcesPreview players={view.players} preview={preparation.individualResourcesPreview} />
+        <IndividualResources players={view.players} resources={preparation.individualResources} />
         <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores}
           twoPlayerSetup={preparation.twoPlayerSetup} firstBattle={preparation.firstBattle} />
       </section> : <>

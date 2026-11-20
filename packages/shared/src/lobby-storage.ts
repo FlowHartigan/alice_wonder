@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import { lobbyWithScores, validInitialPreparation } from './index.ts';
+import { initialResourcesSnapshot, matchesStartingSeat, startingSeatResources } from './initial-resources.ts';
 import { twoPlayerSetupSnapshot } from './setup-quests-v1.ts';
 
+export { STARTING_TOKEN_TYPES, startingSeatResources } from './initial-resources.ts';
+export type { InitialResourcesSnapshot } from './initial-resources.ts';
 export * from './setup-quests-v1.ts';
 
 // Server-only entry point: the public client contract does not import internal setup data.
@@ -22,9 +25,20 @@ const lobbyWithRegionalSetup = lobbyWithScores.extend({
 export const lobbySnapshotV6 = lobbyWithRegionalSetup.safeExtend({ version: z.literal(6) });
 export type LobbySnapshotV6 = z.infer<typeof lobbySnapshotV6>;
 
-export const lobbyState = lobbyWithRegionalSetup.safeExtend({
-  version: z.literal(7), firstBattleRoll: firstBattleRoll.nullable(),
+const lobbyWithFirstBattle = lobbyWithRegionalSetup.safeExtend({
+  firstBattleRoll: firstBattleRoll.nullable(),
 }).refine(({ firstBattleRoll, game }) => (firstBattleRoll === null) === (game === null), {
   message: 'Lancer de Premier combat requis uniquement en préparation lancée', path: ['firstBattleRoll'],
 });
+export const lobbySnapshotV7 = lobbyWithFirstBattle.safeExtend({ version: z.literal(7) });
+export type LobbySnapshotV7 = z.infer<typeof lobbySnapshotV7>;
+
+export const lobbyState = lobbyWithFirstBattle.safeExtend({
+  version: z.literal(8), individualResources: initialResourcesSnapshot.nullable(),
+}).refine(({ game, players, individualResources }) => {
+  if (!game) return individualResources === null;
+  return individualResources !== null && individualResources.length === players.length
+    && players.every(({ id, faction }, i) => faction !== null
+      && matchesStartingSeat(individualResources[i], startingSeatResources(id, faction, players.length)));
+}, { message: 'Dotation initiale incohérente avec les sièges ou les zones', path: ['individualResources'] });
 export type LobbyState = z.infer<typeof lobbyState>;
