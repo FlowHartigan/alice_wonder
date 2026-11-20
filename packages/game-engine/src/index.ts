@@ -3,7 +3,7 @@ import type { LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, Lobby
 import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
 import type { LobbySnapshotV6, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
 import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-region.ts';
-import { firstTeaForSetup, initializeGame, shuffle, teaTableForSetup } from './game.ts';
+import { firstTeaForSetup, individualResourcesForSetup, initializeGame, shuffle, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
 import { assignRegionScoreMarkers } from './region-score-markers.ts';
 import { resolveTwoPlayerRegionSetup } from './two-player-region-setup.ts';
@@ -162,7 +162,9 @@ function firstBattleForSetup(playerCount: number, dieResult: number, excludedReg
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
   const hostInLobby = !state.game && playerId === state.hostId;
   const { game, regionScores, twoPlayerSetup, firstBattleRoll } = state;
-  const firstTeaPreview = game?.playerIds.includes(playerId) ? firstTeaForSetup(game, state.firstPlayerId) : null;
+  const admittedGame = game?.playerIds.includes(playerId) ? game : null;
+  const firstTeaPreview = admittedGame ? firstTeaForSetup(admittedGame, state.firstPlayerId) : null;
+  const individualResourcesPreview = admittedGame ? individualResourcesForSetup(admittedGame, state.players) : null;
   const regionalSetup = firstTeaPreview && regionScores && twoPlayerSetup ? resolveTwoPlayerRegionSetup({
     shuffledQuestDeck: twoPlayerSetup.questOrder.map(getSetupQuestV1), initialRegionScores: regionScores,
   }) : null;
@@ -170,11 +172,12 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
     firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
     launch: hostInLobby ? { blockers: preparationBlockers(state) } : null,
-    preparation: game && regionScores && firstTeaPreview && firstBattleRoll ? {
-      gameId: game.gameId,
-      teaTable: teaTableForSetup(game),
+    preparation: admittedGame && regionScores && firstTeaPreview && individualResourcesPreview && firstBattleRoll ? {
+      gameId: admittedGame.gameId,
+      teaTable: teaTableForSetup(admittedGame),
       firstTeaPreview,
-      firstBattle: firstBattleForSetup(game.playerIds.length, firstBattleRoll.result, regionalSetup?.excludedRegionId),
+      individualResourcesPreview,
+      firstBattle: firstBattleForSetup(admittedGame.playerIds.length, firstBattleRoll.result, regionalSetup?.excludedRegionId),
       twoPlayerSetup: regionalSetup ? {
         revealedQuestTitle: regionalSetup.revealedQuest.title,
         excludedRegion: { id: regionalSetup.excludedRegionId, name: REGION_CATALOG.names[regionalSetup.excludedRegionId] },

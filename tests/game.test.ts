@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { applyGameAction, firstTeaForSetup, initializeGame, privatePlayerView, publicGameView, shuffle, teaTableForSetup } from '@wonderland/game-engine';
-import { gameState } from '@wonderland/shared';
+import { applyGameAction, firstTeaForSetup, individualResourcesForSetup, initializeGame, privatePlayerView, publicGameView, shuffle, teaTableForSetup } from '@wonderland/game-engine';
+import { FACTION_IDS, gameState } from '@wonderland/shared';
 import type { GameAction, GamePhase, GameState } from '@wonderland/shared';
 
 const id = (n: number) => `aaaaaaaa-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -77,6 +77,46 @@ it('WW-SETUP-005 : pas d’aperçu sans J1 admis, hors setup ou avec un effectif
     const playerIds = Array.from({ length: count }, (_, i) => id(i + 2));
     expect(firstTeaForSetup({ ...state, playerIds }, firstPlayer)).toBeNull();
   }
+});
+
+it.each([
+  { count: 2, poison: 4, boardFace: 'golden-two-player', bagTokenCount: 11 },
+  { count: 3, poison: 5, boardFace: 'ordinary', bagTokenCount: 10 },
+  { count: 4, poison: 6, boardFace: 'ordinary', bagTokenCount: 10 },
+  { count: 5, poison: 7, boardFace: 'ordinary', bagTokenCount: 10 },
+  { count: 2, poison: 0, boardFace: 'golden-two-player', bagTokenCount: 11 },
+  { count: 3, poison: 0, boardFace: 'ordinary', bagTokenCount: 10 },
+  { count: 4, poison: 0, boardFace: 'ordinary', bagTokenCount: 10 },
+])('WW-SETUP-002/003 : ressources prévues à $count sièges (Poison : $poison)', ({ count, poison, boardFace, bagTokenCount }) => {
+  const otherFactions = FACTION_IDS.filter((faction) => faction !== 'jabberwocky');
+  const factions = poison ? ['jabberwocky' as const, ...otherFactions].slice(0, count) : otherFactions.slice(0, count);
+  const seats = factions.map((faction, i) => Object.freeze({ id: id(i + 2), faction }));
+  const game = initializeGame(gameId, seats.map(({ id }) => id));
+  Object.freeze(game.playerIds);
+  Object.freeze(game.phase);
+  Object.freeze(game);
+  // A faction outside the frozen seats doesn't add a line or affect the count.
+  const unused = FACTION_IDS.find((faction) => !factions.includes(faction));
+  const roster = Object.freeze([...(unused ? [{ id: id(99), faction: unused }] : []), ...seats.toReversed()]);
+  const preview = () => individualResourcesForSetup(game, roster);
+  expect(preview()).toStrictEqual(seats.map(({ id: playerId, faction }) => ({
+    playerId, faction, boardFace, bagTokenCount, poisonInReserve: faction === 'jabberwocky' ? poison : 0,
+    supportersInReserve: 10, supportersOnThirdForgeTrack: 4, castlesInReserve: 5,
+    artifactsOnForge: 4, coveredAbilities: 4, leaderStrength: 1, shield: 'intact', victoryPoints: 0, combat: 0,
+  })));
+  expect(preview()).toEqual(preview());
+});
+
+it('WW-SETUP-002/003 : aucun aperçu hors setup ou sans les factions des sièges figés', () => {
+  const game = initializeGame(gameId, [firstPlayer, secondPlayer]);
+  const firstSeat = { id: firstPlayer, faction: 'alice' } as const;
+  const seats = [firstSeat, { id: secondPlayer, faction: 'chapelier-fou' } as const];
+  for (const phase of [tea, { type: 'war', round: 1 } as const]) {
+    expect(individualResourcesForSetup({ ...game, phase }, seats)).toBeNull();
+  }
+  expect(individualResourcesForSetup({ ...game, playerIds: [firstPlayer] }, seats)).toBeNull();
+  expect(individualResourcesForSetup(game, [firstSeat])).toBeNull();
+  expect(individualResourcesForSetup(game, [firstSeat, { id: secondPlayer, faction: null }])).toBeNull();
 });
 
 it('rejoue les mêmes intentions et événements à partir du même hasard injecté', () => {

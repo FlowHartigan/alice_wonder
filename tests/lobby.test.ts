@@ -117,6 +117,15 @@ const launchDraws = (count: number) => count === 2 ? 35 : 6;
 const firstBattle = (dieResult: number, id: RegionId) => ({ dieResult, region: { id, name: REGION_CATALOG.names[id] } });
 const rollOfOne = { dieVersion: 1, result: 1 };
 
+function expectedResources(playerId: string, faction: FactionId, count: number, poisonInReserve: number) {
+  return {
+    playerId, faction, boardFace: count === 2 ? 'golden-two-player' : 'ordinary',
+    supportersInReserve: 10, supportersOnThirdForgeTrack: 4, castlesInReserve: 5,
+    artifactsOnForge: 4, coveredAbilities: 4, leaderStrength: 1, shield: 'intact',
+    victoryPoints: 0, combat: 0, bagTokenCount: count === 2 ? 11 : 10, poisonInReserve,
+  };
+}
+
 function expectFiltered(view: LobbyView, ...tokens: string[]) {
   const json = JSON.stringify(view);
   expect(json).not.toMatch(/firstBattleRoll|dieVersion|questOrder|catalogVersion|quest-310|storedMarkerId|excludedPlacement|remainingQuestDeck|excludedQuests|activeRegion(Circuit|Neighbors)|marqueur-score-/);
@@ -272,6 +281,9 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
   const db = new DatabaseSync(database);
   try {
     const before = databaseContents(db);
+    expect(ready.preparation).toBeNull();
+    const codeOnly = { code: created.session.code } as typeof created.session;
+    expect(await outsider.emitWithAck('lobby:resume', codeOnly)).toEqual({ ok: false, error: 'invalid' });
     expect(await guest.emitWithAck('lobby:action', launch(ready.revision))).toEqual({ ok: false, error: 'host-required' });
     expect(await outsider.emitWithAck('lobby:action', launch(ready.revision))).toEqual({ ok: false, error: 'unauthorized' });
     const injected = { ...launch(ready.revision), actorId: created.view.you };
@@ -298,6 +310,10 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
       firstTeaPreview: [
         { playerId: joined.view.you, turn: 1, plannedShards: 2 },
         { playerId: created.view.you, turn: 2, plannedShards: 1 },
+      ],
+      individualResourcesPreview: [
+        expectedResources(created.view.you, 'alice', 2, 0),
+        expectedResources(joined.view.you, 'chapelier-fou', 2, 0),
       ],
       regionScores: { placements: expectedActivePlacements }, twoPlayerSetup: expectedReveal, firstBattle: firstBattle(1, 'comte-de-la-deraison') });
     expect(random).toHaveBeenCalledTimes(launchDraws(2));
@@ -336,6 +352,7 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
     }
     const newSeat = { code: created.session.code, name: 'Trop tard' };
     expect(await outsider.emitWithAck('lobby:join', newSeat)).toEqual({ ok: false, error: 'room-closed' });
+    expect(await outsider.emitWithAck('lobby:resume', codeOnly)).toEqual({ ok: false, error: 'invalid' });
     expect(await outsider.emitWithAck('lobby:resume', { code: newSeat.code, token: 'a'.repeat(43) })).toEqual({ ok: false, error: 'unauthorized' });
     expect(outsiderUpdate).not.toHaveBeenCalled();
     guest.disconnect();
@@ -351,10 +368,12 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
     expect(await newClient.emitWithAck('lobby:join', newSeat)).toEqual({ ok: false, error: 'room-closed' });
     const afterRestoreUpdate = vi.fn();
     guestRestored.on('lobby:update', afterRestoreUpdate);
+    const dataVersion = db.prepare('PRAGMA data_version').get();
     expect(success(await hostRestored.emitWithAck('lobby:action', requests[winner]))).toEqual(prepared);
     // The resume ack on this socket follows any broadcast that the replay could have produced.
     expect(success(await guestRestored.emitWithAck('lobby:resume', joined.session))).toEqual(guestView);
     expect(afterRestoreUpdate).not.toHaveBeenCalled();
+    expect(db.prepare('PRAGMA data_version').get()).toEqual(dataVersion);
     expect(databaseContents(db)).toEqual(persisted);
     expect(random).toHaveBeenCalledTimes(launchDraws(2));
   } finally { db.close(); }
@@ -365,7 +384,7 @@ it.each([
   { count: 3, openChairs: 11, activeBlockers: ['4J', '5J'], shards: [3, 2, 1] },
   { count: 4, openChairs: 12, activeBlockers: ['5J'], shards: [3, 2, 2, 1] },
   { count: 5, openChairs: 13, activeBlockers: [], shards: [3, 2, 2, 1, 0] },
-])('projette les mêmes chaises, marqueurs, Premier combat et aperçu du premier Thé à $count sièges', async ({ count, shards, ...teaTable }) => {
+])('partage les aperçus de préparation à $count sièges, dont le Jabberwocky', async ({ count, shards, ...teaTable }) => {
   const database = tempDatabase();
   let calls = 0;
   const random = vi.fn(() => ++calls === launchDraws(count) ? 0.5 : 0);
@@ -383,9 +402,10 @@ it.each([
     seatIds.push(joined.view.you);
     view = joined.view;
   }
+  // The host is Jabberwocky, while J1 is Alice (second admitted seat).
+  const factions = ['jabberwocky' as const, ...FACTION_IDS.filter((id) => id !== 'jabberwocky')].slice(0, count);
   for (const [i, socket] of seats.entries()) {
-    // Give Alice to the second admitted seat, not to the host.
-    view = success(await socket.emitWithAck('lobby:action', selectFaction(FACTION_IDS[(i + count - 1) % count], view.revision)));
+    view = success(await socket.emitWithAck('lobby:action', selectFaction(factions[i], view.revision)));
     view = success(await socket.emitWithAck('lobby:action', setReady(true, view.revision)));
   }
   const firstPlayerId = seatIds[1];
@@ -402,6 +422,7 @@ it.each([
   const clockwise = [...seatIds.slice(1), seatIds[0]];
   expect(prepared.preparation).toEqual({ gameId: expect.any(String), teaTable,
     firstTeaPreview: shards.map((plannedShards, i) => ({ playerId: clockwise[i], turn: i + 1, plannedShards })),
+    individualResourcesPreview: seatIds.map((id, i) => expectedResources(id, factions[i], count, i === 0 ? count + 2 : 0)),
     regionScores: { placements: count === 2 ? expectedActivePlacements : expectedPlacements },
     twoPlayerSetup: count === 2 ? expectedReveal : null,
     firstBattle: firstBattle(2, count === 2 ? 'donjon-rouge' : 'jardin-des-fleurs-vivantes') });
@@ -422,13 +443,16 @@ it.each([
   }
   for (const guest of guests) guest.disconnect();
   expect(success(await host.emitWithAck('lobby:resume', created.session))).toEqual(prepared);
+  host.disconnect(); // The Jabberwocky remains in the preview while his seat is offline.
   const returned = await connect(url);
   expect(success(await returned.emitWithAck('lobby:resume', sessions[1]))).toEqual(allViews[1]);
   await stop();
   const restoredUrl = await start(database, random);
-  const restored = await Promise.all(sessions.map(async (session) =>
-    success(await (await connect(restoredUrl)).emitWithAck('lobby:resume', session))));
+  const restoredSeats = await Promise.all(sessions.map(() => connect(restoredUrl)));
+  const restored = await Promise.all(sessions.map((session, i) =>
+    restoredSeats[i].emitWithAck('lobby:resume', session).then(success)));
   expect(restored).toEqual(allViews);
+  expect(success(await restoredSeats[0].emitWithAck('lobby:action', request))).toEqual(prepared);
   expect(random).toHaveBeenCalledTimes(launchDraws(count));
 });
 
