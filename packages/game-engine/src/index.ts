@@ -8,6 +8,7 @@ import { assignRegionScoreMarkers } from './region-score-markers.ts';
 import { resolveTwoPlayerRegionSetup } from './two-player-region-setup.ts';
 
 export * from './battle.ts';
+export * from './first-battle-region.ts';
 export * from './game.ts';
 export * from './region-score-markers.ts';
 export * from './two-player-region-setup.ts';
