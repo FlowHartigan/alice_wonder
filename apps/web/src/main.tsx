@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { credentials, FACTION_NAMES, MAX_PLAYERS, MIN_PLAYERS, roomCode } from '@wonderland/shared';
-import type { ClientEvents, ErrorCode, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
+import type { ClientEvents, ErrorCode, IndividualResourcesSetupView, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
 import { BoardPreview } from './BoardPreview.tsx';
 import './styles.css';
 
@@ -59,6 +59,38 @@ function invitation(code: string) {
 
 function seatLabel(players: LobbyView['players'], index: number) {
   return `${players[index].name} (siège ${index + 1})`;
+}
+
+const boardFaceLabels = { ordinary: 'Face ordinaire', 'golden-two-player': 'Face dorée « 2 JOUEURS »' };
+const shieldLabels = { intact: 'Intact' };
+
+function IndividualResourcesPreview({ players, preview }: { players: LobbyView['players']; preview: IndividualResourcesSetupView }) {
+  return <section className="resources-preview" aria-labelledby="resources-title" aria-describedby="resources-note">
+    <h3 id="resources-title">Aperçu des ressources individuelles de départ</h3>
+    <p id="resources-note">Lecture seule : ces ressources sont prévues, pas encore attribuées.</p>
+    <div className="resources-grid">
+      {preview.map((seat) => {
+        const titleId = `resources-${seat.playerId}`;
+        return <article key={seat.playerId} aria-labelledby={titleId}>
+          <h4 id={titleId}>{seatLabel(players, players.findIndex(({ id }) => id === seat.playerId))} — {FACTION_NAMES[seat.faction]}</h4>
+          <dl>
+            <dt>Plateau de faction</dt><dd>{boardFaceLabels[seat.boardFace]}</dd>
+            <dt>Partisans en réserve</dt><dd>{seat.supportersInReserve}</dd>
+            <dt>Partisans sur la troisième piste de Forge</dt><dd>{seat.supportersOnThirdForgeTrack}</dd>
+            <dt>Châteaux en réserve</dt><dd>{seat.castlesInReserve}</dd>
+            <dt>Artefacts sur la Forge</dt><dd>{seat.artifactsOnForge}</dd>
+            <dt>Capacités couvertes</dt><dd>{seat.coveredAbilities}</dd>
+            <dt>Force du Chef</dt><dd>{seat.leaderStrength}</dd>
+            <dt>Bouclier</dt><dd>{shieldLabels[seat.shield]}</dd>
+            <dt>Points de victoire (PV)</dt><dd>{seat.victoryPoints}</dd>
+            <dt>Piste de Combat</dt><dd>{seat.combat}</dd>
+            <dt>Jetons prévus dans le sac</dt><dd>{seat.bagTokenCount}</dd>
+            <dt>Jetons Poison en réserve</dt><dd>{seat.poisonInReserve}</dd>
+          </dl>
+        </article>;
+      })}
+    </div>
+  </section>;
 }
 
 function journalEntry(item: LobbyView['journal'][number], players: LobbyView['players']) {
@@ -247,6 +279,7 @@ function App() {
             <td>{plannedShards}</td>
           </tr>)}</tbody>
         </table>
+        <IndividualResourcesPreview players={view.players} preview={preparation.individualResourcesPreview} />
         <BoardPreview teaTable={preparation.teaTable} regionScores={preparation.regionScores}
           twoPlayerSetup={preparation.twoPlayerSetup} firstBattle={preparation.firstBattle} />
       </section> : <>

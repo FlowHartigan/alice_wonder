@@ -13,6 +13,7 @@ const previewTitle = 'Aperçu du plateau — lecture seule';
 const teaSummary = 'Table du Thé : 11 chaises ouvertes. Chaises 4J et 5J bloquées. Aucune carte n’est installée.';
 const scoreCaption = 'Marqueurs Score de Région — attribution initiale';
 const firstTeaCaption = 'Aperçu — ordre prévu du premier Thé et Éclats de départ';
+const resourcesTitle = 'Aperçu des ressources individuelles de départ';
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
 const reveal = 'Quête révélée : Remporter le croquet du Jardin. Région hors jeu : Jardin des Fleurs vivantes.';
 const excluded = 'jardin-des-fleurs-vivantes';
@@ -53,6 +54,7 @@ async function checkFirstBattle(player: Page, region: typeof scoreSlots[number],
 
 async function checkFirstTea(player: Page, expected: [string, string][]) {
   const table = player.getByRole('table', { name: firstTeaCaption });
+  await expect(table).toHaveCount(1);
   await expect(table).toBeVisible();
   await expect(table).toHaveAccessibleDescription('Les Éclats de départ sont prévus, pas encore crédités. Le premier Thé n’a pas commencé.');
   await expect(table.getByRole('columnheader')).toHaveText(['Rang', 'Joueur', 'Éclats prévus']);
@@ -62,6 +64,29 @@ async function checkFirstTea(player: Page, expected: [string, string][]) {
     await expect(row.getByRole('cell')).toHaveText(cells);
   }
   await expect(table.locator('a, button, input, select, textarea, [tabindex]')).toHaveCount(0);
+}
+
+async function checkIndividualResources(player: Page, expected: [string, number][]) {
+  const preview = player.getByRole('region', { name: resourcesTitle });
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAccessibleDescription('Lecture seule : ces ressources sont prévues, pas encore attribuées.');
+  await expect(preview.getByRole('heading', { level: 4 })).toHaveText(expected.map(([label]) => label));
+  const twoPlayers = expected.length === 2;
+  for (const [name, poison] of expected) {
+    const card = preview.getByRole('article', { name, exact: true });
+    await expect(card.getByRole('term')).toHaveText([
+      'Plateau de faction', 'Partisans en réserve', 'Partisans sur la troisième piste de Forge', 'Châteaux en réserve',
+      'Artefacts sur la Forge', 'Capacités couvertes', 'Force du Chef', 'Bouclier', 'Points de victoire (PV)',
+      'Piste de Combat', 'Jetons prévus dans le sac', 'Jetons Poison en réserve',
+    ]);
+    await expect(card.getByRole('definition')).toHaveText([
+      twoPlayers ? 'Face dorée « 2 JOUEURS »' : 'Face ordinaire', '10', '4', '5', '4', '4', '1', 'Intact', '0', '0',
+      twoPlayers ? '11' : '10', String(poison),
+    ]);
+  }
+  await expect(preview.locator('a, button, input, select, textarea, img, [tabindex]')).toHaveCount(0);
+  await expect(preview.getByText(/Éclats|premier Thé|Quête/)).toHaveCount(0);
+  expect(await preview.evaluate((panel) => panel.scrollWidth <= panel.clientWidth)).toBe(true);
 }
 
 async function checkScores(player: Page, { twoPlayers, imageLoaded = true }: { twoPlayers: boolean; imageLoaded?: boolean }) {
@@ -215,11 +240,13 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
 
       await guestAlice.focus();
       await guest.keyboard.press('Tab');
-      const chapelier = guestFactions.getByRole('button', { name: 'Chapelier fou', exact: true });
-      await expect(chapelier).toBeFocused();
+      await expect(guestFactions.getByRole('button', { name: 'Chapelier fou', exact: true })).toBeFocused();
+      await guest.keyboard.press('Tab');
+      await guest.keyboard.press('Tab');
+      await expect(guestFactions.getByRole('button', { name: 'Jabberwocky', exact: true })).toBeFocused();
       await guest.keyboard.press('Space');
       await expect(guestReady).toBeEnabled();
-      await expect(page.getByText('Dinah a remplacé Alice par Chapelier fou. Son siège est repassé non prêt.')).toBeVisible();
+      await expect(page.getByText('Dinah a remplacé Alice par Jabberwocky. Son siège est repassé non prêt.')).toBeVisible();
       await expect(hostAlice).toHaveAccessibleDescription('Disponible');
       await hostAlice.click();
       await expect(guestAlice).toHaveAccessibleDescription('Prise');
@@ -237,6 +264,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         await expect(player.getByRole('region', { name: previewTitle })).toHaveCount(0);
         await expect(player.getByRole('table', { name: scoreCaption })).toHaveCount(0);
         await expect(player.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
+        await expect(player.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
       }
       await launch.focus();
       await page.keyboard.press('Enter');
@@ -251,12 +279,13 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
           const seats = panel.getByRole('listitem');
           await expect(seats).toHaveCount(2);
           await expect(seats.nth(0)).toContainText(/Camille \(siège 1\).*Alice/);
-          await expect(seats.nth(1)).toContainText(/Dinah \(siège 2\).*Chapelier fou.*Premier joueur \(J1\)/);
+          await expect(seats.nth(1)).toContainText(/Dinah \(siège 2\).*Jabberwocky.*Premier joueur \(J1\)/);
           await expect(player.getByRole('region', { name: 'Votre faction' })).toHaveCount(0);
           await expect(player.getByRole('region', { name: 'Premier joueur' })).toHaveCount(0);
           await expect(player.getByRole('button', { name: 'Lancer la préparation' })).toHaveCount(0);
           await expect(player.getByText('Camille a lancé la préparation.')).toHaveCount(1);
           await checkFirstTea(player, [['Dinah (siège 2)', '2'], ['Camille (siège 1)', '1']]);
+          await checkIndividualResources(player, [['Camille (siège 1) — Alice', 0], ['Dinah (siège 2) — Jabberwocky', 4]]);
           await checkBoard(player);
           await checkScores(player, { twoPlayers: true });
           await checkFirstBattle(player, scoreSlots[0]);
@@ -291,6 +320,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(newcomer.getByRole('alert')).toContainText('Le salon est fermé aux nouvelles admissions');
       await expect(newcomer.getByRole('region', { name: 'Préparation de la partie' })).toHaveCount(0);
       await expect(newcomer.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
+      await expect(newcomer.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
       await expect(newcomer.getByText(/Quête révélée|Région hors jeu|Premier combat|Dé Éclat/)).toHaveCount(0);
       expect(draws).toBe(35);
@@ -302,7 +332,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
   }
 });
 
-for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : Premier combat partagé, cinq scores, pas de retrait`, async ({ page }) => {
+for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : aperçus de préparation partagés`, async ({ page }) => {
   let draws = 0;
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
     random: () => ++draws === 6 ? 0.5 : 0 });
@@ -346,6 +376,7 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await page.getByRole('button', { name: 'Invité 2 (siège 3)' }).click();
     await expect(page.getByRole('table', { name: scoreCaption })).toHaveCount(0);
     await expect(page.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
     await page.getByRole('button', { name: 'Lancer la préparation' }).click();
     await expect(page.getByRole('heading', { name: 'Préparation de la partie' })).toBeFocused();
     await page.keyboard.press('Tab');
@@ -359,7 +390,12 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     const labels = [...guests.slice(1).map((_, i) => `Invité ${i + 2} (siège ${i + 3})`), 'Camille (siège 1)', 'Invité 1 (siège 2)'];
     const shards = count === 3 ? [3, 2, 1] : count === 4 ? [3, 2, 2, 1] : [3, 2, 2, 1, 0];
     const expected: [string, string][] = labels.map((label, i) => [label, String(shards[i])]);
+    const resources: [string, number][] = [
+      ['Camille (siège 1) — Alice', 0], ['Invité 1 (siège 2) — Chapelier fou', 0], ['Invité 2 (siège 3) — Reine de cœur', 0],
+      ['Invité 3 (siège 4) — Jabberwocky', count === 5 ? 7 : 6], ['Invité 4 (siège 5) — Chat du Cheshire', 0],
+    ];
     await checkFirstTea(page, expected);
+    await checkIndividualResources(page, resources.slice(0, count));
     await expect.poll(() => preparedViews.size).toBe(count - 1);
     const [firstGuest, secondGuest] = guests;
     const { hostId, preparation: shared } = preparedViews.get(firstGuest.id)!;
@@ -372,6 +408,7 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     clients[1].disconnect();
     await page.reload();
     await checkFirstTea(page, expected);
+    await checkIndividualResources(page, resources.slice(0, count));
     await checkFirstBattle(page, garden);
     const returned: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
     clients.push(returned);

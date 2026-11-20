@@ -6,6 +6,8 @@ Le [paquet web v1](docs/decisions.md) est une traduction du relevé TTS EN, auto
 
 Les sièges admis voient aussi un aperçu de l'ordre prévu du premier Thé, en tournant depuis J1 dans l'ordre des sièges, et des Éclats de départ prévus pour chacun (dont 0 pour J5 à cinq joueurs). Aucun Éclat n'est encore crédité et le Thé n'a pas commencé. Cet aperçu est recalculé à la reprise, sans modifier la sauvegarde.
 
+L'[aperçu des ressources individuelles](docs/rules-coverage.md#recette-de-laperçu-des-ressources-individuelles) affiche par siège la face du plateau de faction et les ressources prévues, dont le nombre de jetons dans le sac (11 à deux joueurs, 10 sinon) et le Poison du Jabberwocky, si cette faction est jouée. Le panneau est en lecture seule : il ne distribue rien et ne révèle pas le contenu des sacs ni de Quête individuelle.
+
 ## Démarrer en local
 
 Prérequis : Node.js 24 ou plus récent et npm. Sous PowerShell, utilisez `npm.cmd` si `npm` est bloqué par la politique d'exécution.
