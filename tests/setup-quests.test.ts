@@ -32,7 +32,7 @@ it.each([quests[1], quests[5], quests[10], quests[15], quests[20]])('mélange ap
   const random = vi.fn(() => {
     const step = call++;
     // The score shuffle rotates left, then the quest shuffle swaps just the chosen quest to the top.
-    if (step === 34) return 0.5; // Only the final draw is for the die (index 3 → 2).
+    if (step === 34) return 0.5; // The die (index 3 → 2) follows the quest shuffle and precedes both bag shuffles.
     return step < 5 || step === 5 + 29 - index ? 0 : 0.999;
   });
   const reply = launchPreparation(open, host.id, open.revision, randomUUID, random);
@@ -64,5 +64,5 @@ it.each([quests[1], quests[5], quests[10], quests[15], quests[20]])('mélange ap
       expect(preparation.firstBattle.region).toEqual({ id: 'mare-de-larmes', name: 'Mare de Larmes' });
     }
   }
-  expect(random).toHaveBeenCalledTimes(35);
+  expect(random).toHaveBeenCalledTimes(35 + 2 * 10); // Common setup, then 10 swaps per 11-token bag.
 });

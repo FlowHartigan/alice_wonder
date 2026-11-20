@@ -6,7 +6,7 @@ Le [paquet web v1](docs/decisions.md) est une traduction du relevé TTS EN, auto
 
 Les sièges admis voient aussi un aperçu de l'ordre prévu du premier Thé, en tournant depuis J1 dans l'ordre des sièges, et des Éclats de départ prévus pour chacun (dont 0 pour J5 à cinq joueurs). Aucun Éclat n'est encore crédité et le Thé n'a pas commencé. Cet aperçu est recalculé à la reprise, sans modifier la sauvegarde.
 
-L'[aperçu des ressources individuelles](docs/rules-coverage.md#recette-de-laperçu-des-ressources-individuelles) affiche par siège la face du plateau de faction et les ressources prévues, dont le nombre de jetons dans le sac (11 à deux joueurs, 10 sinon) et le Poison du Jabberwocky, si cette faction est jouée. Le panneau est en lecture seule : il ne distribue rien et ne révèle pas le contenu des sacs ni de Quête individuelle.
+La [dotation individuelle de départ](docs/rules-coverage.md#recette-de-la-dotation-individuelle) est enregistrée par le serveur pour les éléments déterminables des étapes A–I. La fiche en lecture seule affiche la face du plateau de faction et les ressources attribuées, dont le Poison du Jabberwocky si cette faction est jouée. Pour chaque sac, elle indique uniquement le nombre de jetons (11 à deux joueurs, 10 sinon). Aucun contenu, ordre ou identifiant de jeton n'est transmis. Pas de Quête individuelle ni de début du Thé.
 
 ## Démarrer en local
 
@@ -37,14 +37,14 @@ npm.cmd start
 
 SQLite enregistre l'état dans `.data/lobbies.sqlite` par défaut (dossier configurable avec `DATA_DIR`). Au redémarrage, ne changez pas l'adresse utilisée dans le navigateur ni le dossier de données pour reprendre le salon.
 
-### Mettre à jour un salon existant (v1 à v6 → v7)
+### Mettre à jour un salon existant (v1 à v7 → v8)
 
 1. Préparez le code mis à jour et compilez le client (`npm ci`, `npm run build`, Node.js ≥ 24) sans lancer un deuxième serveur sur la base active.
 2. Lors d'une fenêtre de maintenance, arrêtez l'ancien serveur, puis faites une sauvegarde SQLite cohérente hors du dossier de données (conservez les éventuels fichiers `-wal` / `-shm` avec la base si vous faites une copie à froid). Ne supprimez pas la base existante.
-3. Lancez `npm start` avec **le même dossier de données** (chemin absolu `DATA_DIR` si vous changez de checkout) et les mêmes paramètres réseau (`HOST`, `PORT`, `PUBLIC_ORIGIN` si défini). Toutes les étapes de migration se font dans une transaction au démarrage. Pour revenir à une ancienne version, arrêtez le serveur v7 et restaurez la sauvegarde d'avant migration avec l'ancien code : les anciennes versions ne savent pas ouvrir une base v7.
+3. Lancez `npm start` avec **le même dossier de données** (chemin absolu `DATA_DIR` si vous changez de checkout) et les mêmes paramètres réseau (`HOST`, `PORT`, `PUBLIC_ORIGIN` si défini). Toutes les étapes de migration se font dans une transaction au démarrage. Pour revenir à une ancienne version, arrêtez le serveur v8 et restaurez la sauvegarde d'avant migration avec l'ancien code : les anciennes versions ne savent pas ouvrir une base v8.
 4. Rechargez le lien **sur la même origine et dans le même profil navigateur**, sans vider le stockage local. Les places et les liens sont conservés. En partant de v1, les anciens sièges prêts doivent choisir une faction puis se redéclarer prêts (migration #5) ; en partant de v2, factions et statuts sont conservés. L'hôte désigne J1 explicitement dans les deux cas. À partir de v3, une désignation valide est conservée. Aucun salon ouvert, même prêt, n'est lancé automatiquement.
 
-Une préparation v4 déjà lancée et sans progression reçoit ses cinq placements lors de l'étape v4 → v5 si l'affectation manque. À l'étape v5 → v6, seule une préparation initiale à deux reçoit un tirage de Quête, sans remélanger ses marqueurs. À l'étape v6 → v7, chaque préparation initiale valide déjà lancée à 2–5 joueurs reçoit un seul lancer : le résultat reste stable sans modifier ses Quêtes, ses placements, ses identifiants, ses sessions, ses reçus, ses révisions ni son journal. Un salon ouvert, même prêt, ne tire rien. Un snapshot incohérent annule la migration entière, y compris la version de la base. À la reprise ou au redémarrage en v7, aucun lancer ni réparation par tirage.
+Une préparation v4 déjà lancée et sans progression reçoit ses cinq placements lors de l'étape v4 → v5 si l'affectation manque. À l'étape v5 → v6, seule une préparation initiale à deux reçoit un tirage de Quête, sans remélanger ses marqueurs. À l'étape v6 → v7, chaque préparation initiale valide déjà lancée à 2–5 joueurs reçoit un seul lancer. À l'étape v7 → v8, ces préparations reçoivent leur dotation sans changer ni rejouer les marqueurs, le tirage de Quête ou le dé, et sans modifier identifiants, sessions, reçus, révisions ou journaux. Un salon ouvert, même prêt, ne reçoit rien. Un snapshot incohérent ou une écriture échouée annule la migration entière, y compris la version de la base. À la reprise ou au redémarrage en v8, aucun nouveau tirage ni réparation.
 
 ## Vérifier
 

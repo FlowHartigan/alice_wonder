@@ -1,10 +1,11 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
 import type { LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, RegionId, Reply } from '@wonderland/shared';
 import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
-import type { LobbySnapshotV6, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
+import type { LobbySnapshotV6, LobbySnapshotV7, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
 import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-region.ts';
-import { firstTeaForSetup, individualResourcesForSetup, initializeGame, shuffle, teaTableForSetup } from './game.ts';
+import { firstTeaForSetup, initializeGame, shuffle, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
+import { distributeInitialResources, projectInitialResources } from './initial-resources.ts';
 import { assignRegionScoreMarkers } from './region-score-markers.ts';
 import { resolveTwoPlayerRegionSetup } from './two-player-region-setup.ts';
 
@@ -18,7 +19,8 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 7, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null, twoPlayerSetup: null, firstBattleRoll: null,
+    version: 8, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null, twoPlayerSetup: null,
+    firstBattleRoll: null, individualResources: null,
     players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
   };
@@ -79,8 +81,13 @@ export function migrateLobbyV5(old: LobbySnapshotV5, random: RandomSource): Lobb
 }
 
 /** Receives a validated v6 snapshot; no earlier setup data is redrawn. */
-export function migrateLobbyV6(old: LobbySnapshotV6, random: RandomSource): LobbyState {
+export function migrateLobbyV6(old: LobbySnapshotV6, random: RandomSource): LobbySnapshotV7 {
   return { ...old, version: 7, firstBattleRoll: old.game ? rollFirstBattleDie(random) : null };
+}
+
+/** Receives a validated v7 snapshot (any launched game is still in untouched initial setup). */
+export function migrateLobbyV7(old: LobbySnapshotV7, random: RandomSource): LobbyState {
+  return { ...old, version: 8, individualResources: old.game ? distributeInitialResources(old.players, random) : null };
 }
 
 /** For legacy open salons or after a future removal from the roster. */
@@ -115,7 +122,9 @@ export function launchPreparation(
   const regionScores = drawRegionScores(game.playerIds.length, random);
   const twoPlayerSetup = game.playerIds.length === 2 ? drawTwoPlayerSetup(regionScores, random) : null;
   const firstBattleRoll = rollFirstBattleDie(random);
-  return { ok: true, value: advance({ ...state, game, regionScores, twoPlayerSetup, firstBattleRoll }, { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
+  const individualResources = distributeInitialResources(state.players, random);
+  return { ok: true, value: advance({ ...state, game, regionScores, twoPlayerSetup, firstBattleRoll, individualResources },
+    { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
 }
 
 export function applyLobbyAction(state: LobbyState, actorId: string, action: LobbyEdit): Reply<LobbyState> {
@@ -161,10 +170,9 @@ function firstBattleForSetup(playerCount: number, dieResult: number, excludedReg
 
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
   const hostInLobby = !state.game && playerId === state.hostId;
-  const { game, regionScores, twoPlayerSetup, firstBattleRoll } = state;
+  const { game, regionScores, twoPlayerSetup, firstBattleRoll, individualResources } = state;
   const admittedGame = game?.playerIds.includes(playerId) ? game : null;
   const firstTeaPreview = admittedGame ? firstTeaForSetup(admittedGame, state.firstPlayerId) : null;
-  const individualResourcesPreview = admittedGame ? individualResourcesForSetup(admittedGame, state.players) : null;
   const regionalSetup = firstTeaPreview && regionScores && twoPlayerSetup ? resolveTwoPlayerRegionSetup({
     shuffledQuestDeck: twoPlayerSetup.questOrder.map(getSetupQuestV1), initialRegionScores: regionScores,
   }) : null;
@@ -172,11 +180,11 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
     firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
     launch: hostInLobby ? { blockers: preparationBlockers(state) } : null,
-    preparation: admittedGame && regionScores && firstTeaPreview && individualResourcesPreview && firstBattleRoll ? {
+    preparation: admittedGame && regionScores && firstTeaPreview && individualResources && firstBattleRoll ? {
       gameId: admittedGame.gameId,
       teaTable: teaTableForSetup(admittedGame),
       firstTeaPreview,
-      individualResourcesPreview,
+      individualResources: projectInitialResources(individualResources),
       firstBattle: firstBattleForSetup(admittedGame.playerIds.length, firstBattleRoll.result, regionalSetup?.excludedRegionId),
       twoPlayerSetup: regionalSetup ? {
         revealedQuestTitle: regionalSetup.revealedQuest.title,

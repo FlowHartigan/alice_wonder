@@ -55,8 +55,8 @@ small { color: #decce5; margin-inline-start: .25rem; }
 .first-tea-preview caption { text-align: start; font-weight: 700; padding-bottom: .35rem; }
 .first-tea-preview th, .first-tea-preview td { text-align: start; padding: .35rem .25rem; border-bottom: 1px solid #614971; }
 .first-tea-preview td { overflow-wrap: anywhere; }
-.resources-preview { margin-block: 1.25rem; }
-.resources-preview h3 { margin: 0; font-size: 1.1rem; }
+.individual-resources { margin-block: 1.25rem; }
+.individual-resources h3 { margin: 0; font-size: 1.1rem; }
 .resources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: .75rem; }
 .resources-grid article { border: 1px solid #614971; border-radius: .65rem; padding: .75rem; background: #1b1423; overflow-wrap: anywhere; }
 .resources-grid h4 { margin: 0 0 .6rem; }

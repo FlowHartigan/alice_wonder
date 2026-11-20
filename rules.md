@@ -77,9 +77,9 @@ La fiche commerciale agrège « 254 pions » sans ventilation et classe les 24 c
 
 **Conventions du salon, non prescrites par le livret :** chaque siège choisit ou modifie sa faction lui-même. Une demande concurrente pour une faction déjà attribuée est refusée ; la disponibilité confirmée est partagée. Il faut une faction pour être prêt. Changer de faction libère l'ancienne et remet le siège à non prêt ; une sélection identique ou le rejeu d'un succès ne change rien.
 
-**Lancement [#7](https://github.com/FlowHartigan/alice_wonder/issues/7) — Validée pour l'exclusivité à l'entrée en préparation.** Sources : livret FR `LKY WWR-R01-FR`, p. 5 A, lots p. 2–3 et noms p. 10–11. Le serveur exige une faction du catalogue différente pour chaque siège et fige ces choix à la transition. Le verrouillage est une convention du salon ; pas de placement, d'attribution de matériel ni de rangement à cette étape.
+**Lancement [#7](https://github.com/FlowHartigan/alice_wonder/issues/7) — Validée pour l'exclusivité à l'entrée en préparation.** Sources : livret FR `LKY WWR-R01-FR`, p. 5 A, lots p. 2–3 et noms p. 10–11. Le serveur exige une faction du catalogue différente pour chaque siège et fige ces choix à la transition. Le verrouillage est une convention du salon.
 
-**Aperçu web [#71](https://github.com/FlowHartigan/alice_wonder/issues/71) — p. 5 A et p. 21 étape 5.** Pendant `setup`, le serveur indique la face à utiliser et la réserve prévue de Poison par siège admis, selon l'effectif figé : `effectif + 2` pour le Jabberwocky, zéro pour tous les autres. Pas de dotation effective ni de présentation des plateaux de faction. Voir aussi l'aperçu B–I ci-dessous.
+**Dotation web [#73](https://github.com/FlowHartigan/alice_wonder/issues/73) — Validée pour la face et la réserve de Poison de l'étape A (p. 5 A, p. 21 étape 5).** À partir des sièges et des factions figés, le serveur enregistre la face et attribue les jetons Poison au seul Jabberwocky, en réserve personnelle et jamais dans le sac. Le Poison non attribué est hors jeu et n'est pas instancié. La vue en `setup` remplace l'aperçu #71 ; elle ne présente pas les plateaux imprimés ni les pouvoirs.
 
 **Contrôle :** choisir deux factions distinctes dont le Jabberwocky ; vérifier les faces 2J, les silhouettes et les quatre emplacements couverts. Refaire à 5J avec les cinq factions, sans emprunt à une autre faction.
 
@@ -98,7 +98,9 @@ La fiche commerciale agrège « 254 pions » sans ventilation et classe les 24 c
 9. **L — Aides.** Poser face visible la carte Référence Alliés de la série en jeu, ranger l'autre et poser la carte Référence des phases à côté.
 10. **M — Chefs.** Placer les silhouettes Chef en Bout de Table, pas dans les Régions. Passer ensuite à l'étape N (`WW-SETUP-005`).
 
-**Aperçu web [#71](https://github.com/FlowHartigan/alice_wonder/issues/71) — p. 5 B–I et p. 21 (« Forge en folie »).** Affiche seulement les quantités et valeurs de départ prévues par siège pour B–I. Le sac est résumé à 10 ou 11 jetons ; aucun contenu de sac ni donnée de Quête ne fait partie de cette vue. Rien n'est attribué, crédité ou placé ; cases, récompenses et pouvoirs propres aux factions ne sont pas modélisés. J–N sont hors de cet aperçu ; le premier Thé et les Éclats prévus restent dans [#63](https://github.com/FlowHartigan/alice_wonder/issues/63), sans changement.
+**Dotation web [#73](https://github.com/FlowHartigan/alice_wonder/issues/73) — Validée pour les quantités, zones et valeurs initiales déterminables de A–I.** Livret FR p. 2–3 (inventaire), p. 5 A–I (dont le Forge de Force 1 illustré en F), et p. 21 (« Forge en folie »). Les jetons attribués sont des instances distinctes : notamment deux Artefacts dans le sac et quatre dans la zone de récompenses de Forge. Les autres pièces sont représentées par leurs valeurs ou quantités, sans case imprimée ni coordonnées. Le serveur mélange et conserve chaque sac après les seules opérations communes déjà actives (marqueurs, retrait régional à 2J, dé de Premier combat), dans l'ordre figé des sièges et non celui de J1. La vue applique `WW-BAG-004`.
+
+**Limite A–I / J–N :** aucune action de pioche, Quête individuelle (#14), carte Pari, aide, silhouette en Bout de Table, distribution d'Éclats ni transition hors de `setup`. Les aperçus du premier Thé et des Éclats (#63) et du retrait 2J restent inchangés. La préparation commune complète (#12) et la préparation individuelle complète (#13) restent ouvertes.
 
 **Contrôle :** suivre l'ordre F–M de la p. 5 avant de passer à N. Décompter les sacs, pistes et réserves pour les quatre effectifs, avec puis sans Jabberwocky quand c'est possible. Suivre une Quête refusée jusque dans la pioche et vérifier que seul le propriétaire voit celle qu'il garde.
 
@@ -221,13 +223,13 @@ Voir la [recette documentaire](docs/rules-coverage.md#recette-documentaire-de-la
 
 ## 5. Sac et jetons — À vérifier
 
-**WW-BAG-001** — À vérifier, p. 2–5 et 22. Cinq familles : Alliés (Forge comprise), Faction (Chef et Artefact), Objet, Folie et Poison. Inventorier forces, exemplaires et visuels du tirage avant de créer le catalogue.
+**WW-BAG-001** — Validée pour le sous-ensemble de la dotation initiale [#73](https://github.com/FlowHartigan/alice_wonder/issues/73) uniquement : jetons Chef et Artefact, Forge (seul Allié instancié ici, faible de Force 1), Folie simple et double, Poison en réserve. Sources : p. 2–3, p. 5 A–F, p. 8 (Forge toujours faible), p. 21 et p. 22 (familles). Le catalogue complet des jetons et des jeux d'Alliés A–D, leurs effets, ventilations, exemplaires et visuels restent à vérifier en [#11](https://github.com/FlowHartigan/alice_wonder/issues/11).
 
 **WW-BAG-002** — À vérifier, p. 8, 13, 15 et 22. Un jeton gagné va par défaut au sac. La fin du combat déplace les Actifs vers les Épuisés sauf effet contraire ; un jeton forgé va sur une piste Forge, tandis qu'un jeton définitivement défaussé retourne à la réserve commune. Tester la conservation de chaque instance dans une seule zone.
 
 **WW-BAG-003** : conditions et méthode de reconstitution / remise à zéro du sac.
 
-**WW-BAG-004** : visibilité des informations : quantités connues et ordre caché.
+**WW-BAG-004** — Validée pour la projection web de la dotation initiale uniquement ([#73](https://github.com/FlowHartigan/alice_wonder/issues/73)). Avant toute pioche, les sièges admis voient le nombre réel de jetons dans chaque sac ; aucun contenu, ordre ni identifiant de jeton ou d'Artefact n'est transmis, même au propriétaire. Le livret établit le décompte initial (p. 5 F et p. 21) et interdit de regarder dans le sac pendant la Guerre (p. 12) ; cette projection n'établit pas la visibilité des quantités ou de la composition pendant le Thé ou la Guerre.
 
 **WW-BAG-005** — À vérifier, p. 9–10, 13 et 22–23. Les jeux d'Alliés A à D attribuent des effets différents aux mêmes familles de jetons ; la force modifiée d'un jeton ne se conserve pas pour une future pioche. Dresser le catalogue des effets et dépendances, y compris Folie et Poison (`WW-WAR-005`).
 

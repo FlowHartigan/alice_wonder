@@ -153,7 +153,7 @@ export type Session = z.infer<typeof credentials>;
 export type TeaTableSetupView = { openChairs: number; activeBlockers: ('4J' | '5J')[] };
 // Public to admitted seats in setup only; not a balance or an active turn.
 export type FirstTeaSetupView = { playerId: string; turn: number; plannedShards: number }[];
-// Planned values only; not player inventory. The bag is represented by a count alone.
+// Initial holdings of admitted seats. Token zones are represented by counts alone.
 export type IndividualResourcesSetupView = {
   playerId: string;
   faction: FactionId;
@@ -169,6 +169,9 @@ export type IndividualResourcesSetupView = {
   combat: number;
   bagTokenCount: number;
   poisonInReserve: number;
+  activeTokenCount: number;
+  exhaustedTokenCount: number;
+  madnessTrackTokenCount: number;
 }[];
 export type TwoPlayerSetupView = {
   revealedQuestTitle: string;
@@ -189,7 +192,7 @@ export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 
     regionScores: RegionScoresSetupView;
     twoPlayerSetup: TwoPlayerSetupView | null;
     firstTeaPreview: FirstTeaSetupView;
-    individualResourcesPreview: IndividualResourcesSetupView;
+    individualResources: IndividualResourcesSetupView;
     firstBattle: FirstBattleSetupView;
   } | null;
   factions: { id: FactionId; status: 'available' | 'yours' | 'taken' }[];
