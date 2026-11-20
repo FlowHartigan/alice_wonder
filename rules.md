@@ -172,6 +172,10 @@ Tableau relevé **visuellement** en bas à droite de la p. 5 du PDF FR : chaque 
 | 4 | 3 | 2 | 2 | 1 | — | 8 |
 | 5 | 3 | 2 | 2 | 1 | 0 | 8 |
 
+**Transfert au moteur [#81](https://github.com/FlowHartigan/alice_wonder/issues/81) — testé, non déclenché par le salon.** En `setup`, N exige deux confirmations distinctes : J–M achevées et préparation commune prête (`WW-SETUP-004`). La fin de J, les projections K–M et l'aperçu ne suffisent pas. Le moteur refuse une phase, des sièges ou un J1 incohérents et réutilise le calcul de l'aperçu. En une seule transition, les sièges partent de zéro et reçoivent les pièces de valeur 1 du tableau ; la banque passe de 30 à 27/24/22/22 pièces de valeur 1 et garde ses 10 pièces de valeur 5. Les deux dénominations et la valeur totale de 80 sont conservées, sans change ni règle de pénurie. Les états avant et après sont immuables ; rejouer le résultat ne débite ni ne crédite de nouveau.
+
+**Salon [#81](https://github.com/FlowHartigan/alice_wonder/issues/81) — information seulement.** Après l'affichage L–M, une phrase sous le plateau précise que les Éclats ne sont pas encore crédités et attendent la fin de la préparation commune. Le tableau reste un aperçu. La distribution effective et persistée relève de [#80](https://github.com/FlowHartigan/alice_wonder/issues/80), bloquée par [#12](https://github.com/FlowHartigan/alice_wonder/issues/12) (Thé I, marché et série/réserves des Alliés) ; [#13](https://github.com/FlowHartigan/alice_wonder/issues/13) reste ouverte. Voir la [recette moteur et salon](docs/rules-coverage.md#recette-du-transfert-n-et-du-message-dattente).
+
 **Contrôle :** pour chaque effectif, désigner un joueur non hôte et tourner autour des sièges depuis lui ; vérifier la ligne, le total prélevé et, à 5J, un J5 présent sans Éclat. Prendre Alice comme J1 dans un cas : son trajet antihoraire ne change pas le siège de J2.
 
 ## 2. Structure de partie — Validation partielle

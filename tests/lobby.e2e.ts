@@ -13,6 +13,7 @@ const previewTitle = 'Aperçu du plateau — lecture seule';
 const teaSummary = 'Table du Thé : 11 chaises ouvertes. Chaises 4J et 5J bloquées. Aucune carte n’est installée.';
 const scoreCaption = 'Marqueurs Score de Région — attribution initiale';
 const firstTeaCaption = 'Aperçu — ordre prévu du premier Thé et Éclats de départ';
+const shardsWaiting = (page: Page) => page.getByText('Les Éclats de départ ne sont pas encore crédités : ils seront attribués quand le plateau commun sera prêt.', { exact: true });
 const resourcesTitle = 'Dotation individuelle de départ';
 const questTitle = 'Votre Quête initiale (étape J)';
 const questPanel = (page: Page) => page.getByRole('region', { name: questTitle });
@@ -39,6 +40,7 @@ async function checkNoLateSetup(player: Page) {
   await expect(phaseReference(player)).toHaveCount(0);
   await expect(leadersList(player)).toHaveCount(0);
   await expect(leaderGroup(player)).toHaveCount(0);
+  await expect(shardsWaiting(player)).toHaveCount(0);
 }
 
 async function checkPhaseReference(player: Page) {
@@ -375,7 +377,10 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(hostQuest.getByRole('heading', { level: 4 })).toHaveText([hostTitles[1]]);
       await expect(guestQuest.getByRole('heading', { level: 4 })).toHaveText(guestTitles);
       await expect(guestQuest.getByRole('status')).toContainText('Ces deux propositions sont privées');
-      for (const player of [page, guest]) await checkNoLateSetup(player);
+      for (const player of [page, guest]) {
+        await checkNoLateSetup(player);
+        await checkFirstTea(player, [['Dinah (siège 2)', '2'], ['Camille (siège 1)', '1']]);
+      }
       await guestQuest.getByRole('button', { name: `Garder « ${guestTitles[0]} »` }).click();
       await expect(guestQuest.getByRole('status')).toHaveText(/Choix enregistré/);
       const checkEmptyHand = async (player: Page) => {
@@ -388,6 +393,9 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
         await checkEmptyHand(player);
         await checkPhaseReference(player);
         await checkLeaders(player, leaders, { compact });
+        await expect(shardsWaiting(player)).toBeVisible();
+        await expect(player.locator('[aria-live="polite"]').filter({ has: shardsWaiting(player) })).toHaveCount(1);
+        await checkFirstTea(player, [['Dinah (siège 2)', '2'], ['Camille (siège 1)', '1']]);
       };
       await Promise.all([checkLateSetup(page), checkLateSetup(guest)]);
       await expect(guest.getByRole('region', { name: 'Journal du salon' })).not.toContainText(guestTitles[0]);
@@ -505,7 +513,7 @@ test('à 320 px, les Chefs au Bout de Table ne recouvrent pas Premier combat au 
   }
 });
 
-for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés : Quêtes et Paris privés, aides et Chefs`, async ({ page }) => {
+async function checkMultiseatSetup(page: Page, count: number) {
   let draws = 0;
   const server = makeServer({ database: ':memory:', webRoot: fileURLToPath(new URL('../apps/web/dist', import.meta.url)),
     random: () => ++draws === 35 ? 0.5 : 0 }); // Le dé suit aussi le mélange de Quêtes à 3–5J.
@@ -551,6 +559,7 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await expect(page.getByRole('table', { name: scoreCaption })).toHaveCount(0);
     await expect(page.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
     await expect(page.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
+    await expect(shardsWaiting(page)).toHaveCount(0);
     await page.getByRole('button', { name: 'Lancer la préparation' }).click();
     await expect(page.getByRole('heading', { name: 'Préparation de la partie' })).toBeFocused();
     for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
@@ -588,8 +597,8 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
       victoryPoints: 0, combat: 0, bagTokenCount: 10, poisonInReserve: resources[i][1],
       activeTokenCount: 0, exhaustedTokenCount: 0, madnessTrackTokenCount: 0,
     }));
-    const ownTitles = await questPanel(page).getByRole('heading', { level: 4 }).allTextContents();
-    expect(ownTitles).toHaveLength(2);
+    const ownTitles = ['Remporter le croquet du Jardin', 'Se lier d’amitié avec tous'];
+    await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText(ownTitles);
     const distinctTitles = new Set(ownTitles);
     for (const { id } of guests) {
       const preparation = preparedViews.get(id)?.preparation;
@@ -610,6 +619,7 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await checkFirstTea(page, expected);
     await checkIndividualResources(page, resources.slice(0, count));
     await checkFirstBattle(page, garden);
+    await checkNoLateSetup(page);
     const returned: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
     clients.push(returned);
     returned.on('lobby:update', recordPreparation);
@@ -635,6 +645,7 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     }));
     await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText(ownTitles);
     await checkNoLateSetup(page);
+    await checkFirstTea(page, expected);
     await questPanel(page).getByRole('button', { name: `Garder « ${ownTitles[0]} »` }).click();
     await expect(questPanel(page).getByRole('status')).toContainText('Choix enregistré');
     const checkHand = async () => {
@@ -649,12 +660,15 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await checkHand();
     await checkPhaseReference(page);
     await checkLeaders(page, leaders);
+    await expect(shardsWaiting(page)).toBeVisible();
+    await checkFirstTea(page, expected);
     for (const [i, socket] of guestSockets.entries()) {
       const view = success(await socket.emitWithAck('lobby:resume', guests[i].session));
       expect(view).toEqual(preparedViews.get(guests[i].id));
       expect(view.preparation?.initialQuest.type).toBe('kept');
       expect(view.preparation?.initialBets).toEqual(FACTION_IDS.slice(0, count).filter((_, j) => j !== i + 1));
       expect(view.preparation?.initialLeaders).toStrictEqual(initialLeaders);
+      expect(view.preparation?.firstTeaPreview).toEqual(shared?.firstTeaPreview);
       expect(updates[i]).toEqual(['setup-quest:update', 'lobby:update']);
     }
     await page.reload();
@@ -662,10 +676,20 @@ for (const count of [3, 4, 5]) test(`${count} sièges dont ${count - 1} simulés
     await checkHand();
     await checkPhaseReference(page);
     await checkLeaders(page, leaders);
+    await expect(shardsWaiting(page)).toBeVisible();
+    await checkFirstTea(page, expected);
     await expect(page.getByText(/Le premier Thé n’a pas commencé/)).toBeVisible();
     expect(draws).toBe(35 + count * 9 + Array.from({ length: count }, (_, i) => 30 - 2 * count + i).reduce((a, b) => a + b));
   } finally {
     for (const client of clients) client.disconnect();
     await server.close();
   }
-});
+}
+
+const firefoxTest = test.extend({ browserName: 'firefox' });
+for (const [browser, browserTest] of [['Chromium', test], ['Firefox', firefoxTest]] as const) {
+  for (const count of [3, 4, 5]) {
+    browserTest(`${browser} : ${count} sièges dont ${count - 1} simulés, Quêtes et Paris privés, aides, Chefs et Éclats prévus`,
+      async ({ page }) => checkMultiseatSetup(page, count));
+  }
+}
