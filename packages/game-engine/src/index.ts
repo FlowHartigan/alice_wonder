@@ -1,7 +1,7 @@
-import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
+import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, allySeriesLetter, initialRegionScores, preparationBlockers } from '@wonderland/shared';
 import type { InitialLeadersSetupView, LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, RegionId, Reply } from '@wonderland/shared';
 import { countInitialCentralReserves, initialAllyStock, SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
-import type { LobbySnapshotV6, LobbySnapshotV7, LobbySnapshotV8, LobbySnapshotV9, LobbySnapshotV10, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
+import type { LobbySnapshotV6, LobbySnapshotV7, LobbySnapshotV8, LobbySnapshotV9, LobbySnapshotV10, LobbySnapshotV11, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
 import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-region.ts';
 import { firstTeaForSetup, initializeGame, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
@@ -22,7 +22,7 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 11, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null,
+    version: 12, code, hostId: host.id, revision: 1, firstPlayerId: null, allySeries: null, game: null, regionScores: null,
     firstBattleRoll: null, individualResources: null, initialQuests: null, centralReserves: null,
     players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
@@ -106,7 +106,7 @@ export function migrateLobbyV9(old: LobbySnapshotV9): LobbySnapshotV10 {
 }
 
 /** Backfill only Ally stock on a validated v10 snapshot; no replay or RNG. */
-export function migrateLobbyV10(old: LobbySnapshotV10): LobbyState {
+export function migrateLobbyV10(old: LobbySnapshotV10): LobbySnapshotV11 {
   const { centralReserves, individualResources } = old;
   return { ...old, version: 11,
     centralReserves: centralReserves && individualResources ? { ...centralReserves, ...initialAllyStock(individualResources) } : null,
@@ -118,7 +118,10 @@ export function normalizeFirstPlayer(state: LobbyState): LobbyState;
 export function normalizeFirstPlayer(state: LobbySnapshotV6): LobbySnapshotV6;
 export function normalizeFirstPlayer(state: LobbyState | LobbySnapshotV6): LobbyState | LobbySnapshotV6 {
   if (state.game || state.firstPlayerId === null || state.players.some(({ id }) => id === state.firstPlayerId)) return state;
-  return { ...state, firstPlayerId: null, ...appendEvent(state.journal, { revision: state.revision + 1, type: 'first-player-cleared' }) };
+  const event = { revision: state.revision + 1, type: 'first-player-cleared' } as const;
+  return state.version === 6
+    ? { ...state, firstPlayerId: null, ...appendEvent(state.journal, event) }
+    : { ...state, firstPlayerId: null, ...appendEvent(state.journal, event) };
 }
 
 export function joinLobby(state: LobbyState, player: NewPlayer): Reply<LobbyState> {
@@ -167,6 +170,15 @@ export function applyLobbyAction(state: LobbyState, actorId: string, action: Lob
     if (action.expectedRevision !== state.revision) return { ok: false, error: 'conflict' };
     return { ok: true, value: advance({ ...state, firstPlayerId }, { revision, type: action.type, actorId, firstPlayerId }) };
   }
+  if (action.type === 'select-ally-series') {
+    // WW-SETUP-004 step 3 — the host records the table's choice, without preparing cards or stock.
+    if (actorId !== state.hostId) return { ok: false, error: 'host-required' };
+    const { allySeries } = action;
+    if (!allySeriesLetter.safeParse(allySeries).success) return { ok: false, error: 'invalid' };
+    if (state.allySeries === allySeries) return { ok: true, value: state };
+    if (action.expectedRevision !== state.revision) return { ok: false, error: 'conflict' };
+    return { ok: true, value: advance({ ...state, allySeries }, { revision, type: action.type, actorId, allySeries }) };
+  }
   if (action.type === 'select-faction') {
     if (player.faction === action.faction) return { ok: true, value: state };
     // WW-SETUP-002 — one lot per faction. Check against the current state under the write lock.
@@ -204,9 +216,10 @@ function initialLeadersForSetup(playerIds: readonly string[], players: LobbyStat
 }
 
 export function viewFor(state: LobbyState, playerId: string): LobbyView {
-  const hostInLobby = !state.game && playerId === state.hostId;
   const { game, regionScores, initialQuests, firstBattleRoll, individualResources } = state;
   const admittedGame = game?.playerIds.includes(playerId) ? game : null;
+  const admitted = game ? admittedGame !== null : state.players.some(({ id }) => id === playerId);
+  const hostInLobby = !game && admitted && playerId === state.hostId;
   const firstTeaPreview = admittedGame ? firstTeaForSetup(admittedGame, state.firstPlayerId) : null;
   const initialQuest = admittedGame ? initialQuestFor(state, playerId) : undefined;
   const initialBets = initialBetsFor(state, playerId);
@@ -215,6 +228,7 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
   return {
     code: state.code, hostId: state.hostId, revision: state.revision, you: playerId,
     firstPlayerId: state.firstPlayerId, canSelectFirstPlayer: hostInLobby,
+    allySeries: admitted ? state.allySeries : null, canSelectAllySeries: hostInLobby,
     launch: hostInLobby ? { blockers: preparationBlockers(state) } : null,
     preparation: admittedGame && regionScores && firstTeaPreview && individualResources && firstBattleRoll && initialQuest ? {
       gameId: admittedGame.gameId,
@@ -246,6 +260,6 @@ export function viewFor(state: LobbyState, playerId: string): LobbyView {
       const owner = state.players.find(({ faction }) => faction === id);
       return { id, status: !owner ? 'available' : owner.id === playerId ? 'yours' : 'taken' };
     }),
-    journal: state.journal,
+    journal: admitted ? state.journal : state.journal.filter(({ type }) => type !== 'select-ally-series'),
   };
 }

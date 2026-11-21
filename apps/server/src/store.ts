@@ -4,7 +4,7 @@ import { createLobby, joinLobby, applyLobbyAction, chooseInitialQuest, initialQu
 import type { RandomSource } from '@wonderland/game-engine';
 import { lobbySnapshotV5, lobbySnapshotV4, lobbyStateV1, lobbyStateV2, lobbyStateV3 } from '@wonderland/shared';
 import type { GameAction, GameReceipt, InitialQuestView, LobbyAction, Reply, Session } from '@wonderland/shared';
-import { lobbySnapshotV6, lobbySnapshotV7, lobbySnapshotV8, lobbySnapshotV9, lobbySnapshotV10, lobbyState } from '@wonderland/shared/lobby-storage';
+import { lobbySnapshotV6, lobbySnapshotV7, lobbySnapshotV8, lobbySnapshotV9, lobbySnapshotV10, lobbySnapshotV11, lobbyState } from '@wonderland/shared/lobby-storage';
 import type { LobbyState } from '@wonderland/shared/lobby-storage';
 
 export type Seat = { code: string; playerId: string };
@@ -42,8 +42,10 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
     }
   }
 
-  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
-    const rows = db.prepare('SELECT code, snapshot FROM lobbies').all();
+  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12) {
+    // Keep the existing traversal for historical migrations that consume the injected RNG.
+    const rows = db.prepare(version === 11 ? 'SELECT code, snapshot FROM lobbies ORDER BY code'
+      : 'SELECT code, snapshot FROM lobbies').all();
     for (const row of rows) {
       const raw: unknown = JSON.parse(String(row.snapshot));
       if (version === 1) {
@@ -85,10 +87,19 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       } else if (version === 10) {
         const old = lobbySnapshotV10.parse(raw);
         if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v10');
-        save(migrateLobbyV10(old));
+        writeSnapshot(lobbySnapshotV11.parse(migrateLobbyV10(old)));
+      } else if (version === 11) {
+        const old = lobbySnapshotV11.parse(raw);
+        if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v11');
+        // Change only the snapshot envelope. In particular game.history (J receipts) and
+        // accepted_actions (lobby fingerprints, not views) keep their historical encoding.
+        const upgraded = db.prepare(`UPDATE lobbies
+          SET snapshot = json_set(snapshot, '$.version', 12, '$.allySeries', NULL)
+          WHERE code = ? RETURNING snapshot`).get(old.code);
+        lobbyState.parse(JSON.parse(String(upgraded?.snapshot)));
       } else {
         const snapshot = lobbyState.parse(raw);
-        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v11');
+        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v12');
       }
     }
   }
@@ -97,7 +108,7 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
     db.exec('PRAGMA busy_timeout = 5000');
     transaction(() => {
       const version = db.prepare('PRAGMA user_version').get()?.user_version;
-      if (typeof version !== 'number' || !Number.isInteger(version) || version < 0 || version > 11) {
+      if (typeof version !== 'number' || !Number.isInteger(version) || version < 0 || version > 12) {
         throw new Error('Version de base non prise en charge');
       }
       if (version === 0) db.exec(migration1);
@@ -110,11 +121,11 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       if (version <= 7) restoreSnapshots(7);
       if (version <= 8) restoreSnapshots(8);
       if (version <= 9) restoreSnapshots(9);
-      if (version <= 10) {
-        restoreSnapshots(10);
-        // Preserve sessions and successful action fingerprints through all steps.
-        db.exec('PRAGMA user_version = 11');
-      } else restoreSnapshots(11);
+      if (version <= 10) restoreSnapshots(10);
+      if (version <= 11) {
+        restoreSnapshots(11);
+        db.exec('PRAGMA user_version = 12');
+      } else restoreSnapshots(12);
     });
   } catch (error) {
     db.close();
@@ -193,6 +204,7 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       return transaction(() => {
         const state = load(seat.code);
         if (!state) return { ok: false, error: 'room-not-found' };
+        if (!state.players.some(({ id }) => id === seat.playerId)) return { ok: false, error: 'unauthorized' };
         const args = [seat.code, seat.playerId, action.actionId] as const;
         const previous = db.prepare(
           'SELECT intent FROM accepted_actions WHERE code = ? AND player_id = ? AND action_id = ?',
@@ -200,7 +212,8 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
         // Preserve the v1 encoding for set-ready so accepted_actions still deduplicates it.
         const parameter = action.type === 'set-ready' ? action.ready
           : action.type === 'select-faction' ? action.faction
-          : action.type === 'select-first-player' ? action.firstPlayerId : '';
+          : action.type === 'select-first-player' ? action.firstPlayerId
+          : action.type === 'select-ally-series' ? action.allySeries : '';
         const intent = `${action.type}:${parameter}:${action.expectedRevision}`;
         if (previous) return previous.intent === intent
           ? { ok: true, value: { state, changed: false } }
