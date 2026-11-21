@@ -16,6 +16,7 @@ export * from './game.ts';
 export * from './initial-quests.ts';
 export * from './region-score-markers.ts';
 export * from './starting-shards.ts';
+export * from './tea-setup.ts';
 export * from './two-player-region-setup.ts';
 
 type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;

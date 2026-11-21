@@ -150,6 +150,16 @@ Le stock est sauvegardé avec le lancement, sans projection supplémentaire. La 
 
 **Contrôle :** avec un marché d'essai mêlant Habitant et Objet, obtenir 3 cartes correctement équipées. À 4J avec un résultat de dé 2, conserver le bloqueur sur 5J et placer Premier combat au Jardin des Fleurs vivantes, sans ajouter d'Éclats aux joueurs.
 
+#### Préparation des paquets du Thé au moteur
+
+**[#92](https://github.com/FlowHartigan/alice_wonder/issues/92) — étapes 7–9, moteur seul.** Livret FR `LKY WWR-R01-FR`, p. 2–3 (30 par round), p. 4 étapes 7–9 et p. 21 ; `WW-COUNT-001/002`. `prepareInitialTea({ playerCount, decks }, random)` attend l'effectif figé des sièges admis (2–5, pas les connexions), trois paquets aux clés `1`, `2`, `3` et une `RandomSource` injectée. Avant tout hasard, le moteur vérifie les trois lots de 30, la concordance des `round` et les `id` non blancs, uniques par égalité exacte sur les 90 instances. Il ne lit ni le motif ni les effets et ne modifie pas les entrées. Un inventaire incohérent déclenche `TypeError`.
+
+Fisher–Yates mélange une fois I, puis II, puis III (29 appels chacun, 87 au total). Le dessus est à l'index 0. Le préfixe de I garnit les chaises ouvertes face visible selon le calcul de #54 : 11/11/12/13 placements à 2/3/4/5J ; le suffixe de I reste privé (19/19/18/17), de même que II et III entiers (30 chacun). Toutes les instances sont conservées ; aucun retrait de carte Thé à 2J (les exclusions visent le marché), et la cinquième carte à gagner relève du déroulement du Thé. Aucun tirage pour le placement ; une valeur aléatoire hors contrat déclenche `RangeError`, sans résultat partiel.
+
+**Convention technique :** `chairIndex` 0 à 10 pour les chaises communes, 11 pour 4J et 12 pour 5J lorsqu'elles sont ouvertes. Aucun lien avec l'ordre physique, un point de départ ou un sens de déplacement. Ni siège joueur, ni Bout de Table, ni emplacement de pioche ne reçoivent de carte. Le résultat moteur sépare la table face visible des réserves privées ; il n'est pas une projection réseau. Voir les [tests](docs/rules-coverage.md#recette-de-la-préparation-des-paquets-du-thé).
+
+Le branchement autoritaire (#12) reste distinct : ordre global du hasard, sauvegarde/reprise, projection et correspondance physique des chaises. Il attend en [#9](https://github.com/FlowHartigan/alice_wonder/issues/9) des inventaires FR vérifiés par exemplaire pour les trois paquets (référence, tirage, errata et relevé physique complet ou confirmation équivalente de l'éditeur) et une source autorisée. Les quantités du livret et les preuves partielles de Thé I (PR #84) ne valident pas la composition. Aucun effet, réapprovisionnement, marché, signal de préparation commune prête, N ou ouverture du Thé ; l'ordre du hasard au lancement ne change pas.
+
 #### Région de Premier combat au moteur
 
 **Parcours validé ([#67](https://github.com/FlowHartigan/alice_wonder/issues/67)).** Livret FR `LKY WWR-R01-FR`, p. 4 étape 11 et p. 21 étape 4 (`WW-COUNT-001`) ; circuit du catalogue [`WW-MAP-001`](#ww-map-001--catalogue-des-régions). `resolveFirstBattleRegion` prend des données internes : `playerCount` (2, 3, 4 ou 5), `dieResult` (nombre de pas déjà fourni, entier fini et non négatif) et `excludedRegionId` (ID connu de la Région déjà retirée, requis à 2J et interdit à 3–5J). Une entrée incohérente est refusée par `TypeError`.

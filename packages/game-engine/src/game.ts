@@ -14,11 +14,15 @@ export function initializeGame(gameId: string, playerIds: string[]): GameState {
   });
 }
 
-/** WW-SETUP-004 (étape 7), WW-COUNT-001/002. Excludes the Bout de Table and the deck space. */
 export function teaTableForSetup({ playerIds }: GameState): TeaTableSetupView {
+  return teaTableForPlayerCount(playerIds.length);
+}
+
+/** WW-SETUP-004 (étape 7), WW-COUNT-001/002. Expects a validated seat count. */
+export function teaTableForPlayerCount(playerCount: number): TeaTableSetupView {
   const activeBlockers: TeaTableSetupView['activeBlockers'] = [];
-  if (playerIds.length < 4) activeBlockers.push('4J');
-  if (playerIds.length < 5) activeBlockers.push('5J');
+  if (playerCount < 4) activeBlockers.push('4J');
+  if (playerCount < 5) activeBlockers.push('5J');
   return { openChairs: 13 - activeBlockers.length, activeBlockers };
 }
 
