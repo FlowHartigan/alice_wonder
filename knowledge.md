@@ -32,5 +32,7 @@
 
 ## À garder en tête pour la suite
 
+- Le contrôle de chevauchement des repères au Comté à 280 px est passé sous Chromium local (Windows) mais échoue sous Chromium sur Ubuntu 24.04 ([CI de la PR #87](https://github.com/FlowHartigan/alice_wonder/actions/runs/44893520616)). Blocage ouvert : reproduire sous Linux et corriger le placement sans modifier l’assertion. En CI, récupérer le rapport et les traces via l’artefact `playwright-diagnostics`.
+- Sous Windows, Firefox Playwright peut échouer au lancement avec `spawn UNKNOWN` malgré l’installation du navigateur. La cause locale n’a pas été établie ; la CI Ubuntu de la PR #87 a exécuté avec succès les parcours Firefox du socle.
 - Sous PowerShell, utiliser `npm.cmd` ou `opencode.cmd` si l’exécution des scripts `.ps1` est bloquée. Pour le test entre navigateurs, installer Chromium et Firefox via `npx.cmd playwright install chromium firefox`, puis compiler avant `npm.cmd run test:e2e` : le test sert les fichiers compilés.
 - L’édition **Lucky Duck Games FR `LKY WWR-R01-FR`** et la désignation du premier joueur par l’hôte après accord de la table sont consignées dans [`rules.md`](rules.md) et [`docs/decisions.md`](docs/decisions.md). La [recette documentaire de #2](docs/rules-coverage.md#recette-documentaire-de-la-mise-en-place) valide des sous-périmètres précis du livret, sans établir le tirage de la boîte ni la conformité de son matériel. Distinguer les bilans par étape (p. ex. Paris pris à A, pas décompte après K) et ne pas importer de correctifs anglophones sans preuve d'applicabilité FR.
