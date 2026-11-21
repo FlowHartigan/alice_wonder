@@ -1,7 +1,7 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
 import type { InitialLeadersSetupView, LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, RegionId, Reply } from '@wonderland/shared';
-import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
-import type { LobbySnapshotV6, LobbySnapshotV7, LobbySnapshotV8, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
+import { countInitialCentralReserves, SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
+import type { LobbySnapshotV6, LobbySnapshotV7, LobbySnapshotV8, LobbySnapshotV9, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
 import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-region.ts';
 import { firstTeaForSetup, initializeGame, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
@@ -22,8 +22,8 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 9, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null,
-    firstBattleRoll: null, individualResources: null, initialQuests: null,
+    version: 10, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null,
+    firstBattleRoll: null, individualResources: null, initialQuests: null, centralReserves: null,
     players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
   };
@@ -91,11 +91,18 @@ export function migrateLobbyV7(old: LobbySnapshotV7, random: RandomSource): Lobb
 }
 
 /** v8 has no J state yet. At 2J the old order already fixes the reveal and remaining deck. */
-export function migrateLobbyV8({ twoPlayerSetup, ...old }: LobbySnapshotV8, random: RandomSource): LobbyState {
-  const next: LobbyState = { ...old, version: 9, initialQuests: null };
+export function migrateLobbyV8({ twoPlayerSetup, ...old }: LobbySnapshotV8, random: RandomSource): LobbySnapshotV9 {
+  const next: LobbySnapshotV9 = { ...old, version: 9, initialQuests: null };
   if (!old.game || !old.regionScores) return next;
   const order = twoPlayerSetup?.questOrder ?? shuffleSetupQuestIds(random);
   return { ...next, ...dealInitialQuests(old.game, questSupply(order, old.game.playerIds.length, old.regionScores)) };
+}
+
+/** Receives a validated v9 snapshot, before or after J. Only step 6 is backfilled. */
+export function migrateLobbyV9(old: LobbySnapshotV9): LobbyState {
+  return { ...old, version: 10,
+    centralReserves: old.individualResources ? countInitialCentralReserves(old.individualResources) : null,
+  };
 }
 
 /** For legacy open salons or after a future removal from the roster. */
@@ -132,8 +139,9 @@ export function launchPreparation(
   const supply = questSupply(shuffleSetupQuestIds(random), game.playerIds.length, regionScores);
   const firstBattleRoll = rollFirstBattleDie(random);
   const individualResources = distributeInitialResources(state.players, random);
+  const centralReserves = countInitialCentralReserves(individualResources);
   const quests = dealInitialQuests(game, supply);
-  return { ok: true, value: advance({ ...state, ...quests, regionScores, firstBattleRoll, individualResources },
+  return { ok: true, value: advance({ ...state, ...quests, regionScores, firstBattleRoll, individualResources, centralReserves },
     { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
 }
 

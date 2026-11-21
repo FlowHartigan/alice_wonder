@@ -10,8 +10,8 @@ import type { Socket } from 'socket.io-client';
 import { makeServer } from '../apps/server/src/server.ts';
 import { applyLobbyAction, createLobby, isReadyForSetupK, joinLobby, launchPreparation, normalizeFirstPlayer, shuffle, viewFor } from '@wonderland/game-engine';
 import { FACTION_IDS, REGION_CATALOG, gameState } from '@wonderland/shared';
-import type { ClientEvents, FactionId, GameAction, InitialQuestView, LobbyAction, LobbyView, RegionId, Reply, ServerEvents } from '@wonderland/shared';
-import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1, lobbySnapshotV6, lobbySnapshotV7, lobbySnapshotV8, lobbyState, questOptionId, startingSeatResources } from '@wonderland/shared/lobby-storage';
+import type { ClientEvents, FactionId, GameAction, GameReceipt, InitialQuestView, LobbyAction, LobbyView, RegionId, Reply, ServerEvents, Session } from '@wonderland/shared';
+import { SETUP_QUEST_CATALOG_V1, getSetupQuestV1, lobbySnapshotV6, lobbySnapshotV7, lobbySnapshotV8, lobbySnapshotV9, lobbyState, questOptionId, startingSeatResources } from '@wonderland/shared/lobby-storage';
 import type { LobbySnapshotV8, LobbyState, QuestId } from '@wonderland/shared/lobby-storage';
 
 type LobbySocket = Socket<ServerEvents, ClientEvents>;
@@ -127,7 +127,7 @@ function publicPreparation(view: LobbyView) {
   return shared;
 }
 
-function legacyV8({ initialQuests, ...state }: LobbyState, order = expectedQuestSnapshot.questOrder): LobbySnapshotV8 {
+function legacyV8({ initialQuests, centralReserves: _, ...state }: LobbyState, order = expectedQuestSnapshot.questOrder): LobbySnapshotV8 {
   return lobbySnapshotV8.parse({ ...state, version: 8,
     game: state.game && { ...state.game, decisions: [], history: [], revision: 0 },
     twoPlayerSetup: initialQuests?.twoPlayerOut ? { catalogVersion: 1, questOrder: order } : null,
@@ -143,10 +143,15 @@ function expectedQuestZones(order: QuestId[], count: number) {
     twoPlayerOut: count === 2 ? { revealed: head, removed: removed.slice(1) } : null };
 }
 
+function expectedCentralReserves(single: number, double: number) {
+  return { undistributedMadness: { single, double }, shardBank: { 1: 30, 5: 10 } };
+}
+
 function expectUpgrade(state: LobbyState, old: LobbySnapshotV8, fraction: number) {
-  const { initialQuests, game, ...unchanged } = state;
+  const { initialQuests, game, centralReserves, ...unchanged } = state;
   const { twoPlayerSetup, game: oldGame, ...prior } = old;
-  expect(unchanged).toEqual({ ...prior, version: 9 });
+  expect(unchanged).toEqual({ ...prior, version: 10 });
+  expect(centralReserves).toEqual(oldGame ? expectedCentralReserves(29 - 2 * old.players.length, 5 - old.players.length) : null);
   if (oldGame && game) expect({ ...game, decisions: [] }).toEqual(oldGame);
   else expect(game).toBe(oldGame);
   expect(initialQuests).toEqual(oldGame
@@ -178,7 +183,7 @@ function instanceIds(state: LobbyState) {
 function expectFiltered(view: LobbyView, ...tokens: string[]) {
   const json = JSON.stringify(view);
   expect(json).not.toMatch(/firstBattleRoll|dieVersion|questOrder|catalogVersion|quest-310|storedMarkerId|excludedPlacement|remainingQuestDeck|excludedQuests|activeRegion(Circuit|Neighbors)|marqueur-score-|twoPlayerOut|"deck"/);
-  expect(json).not.toMatch(/tokenZones|forgeRewards|poisonReserve|leader-[12]|artifact-3|forge-1|madness-(single|double)|individualResourcesPreview/);
+  expect(json).not.toMatch(/tokenZones|forgeRewards|poisonReserve|leader-[12]|artifact-3|forge-1|madness-(single|double)|individualResourcesPreview|centralReserves|undistributedMadness|shardBank|commonSetupReady/);
   const quest = view.preparation?.initialQuest;
   const own = quest?.type === 'offer' ? quest.cards.map(({ title }) => title) : [quest?.card.title];
   for (const { title } of SETUP_QUEST_CATALOG_V1.quests) {
@@ -317,6 +322,7 @@ it('refuse chaque précondition du lancement sans changer la configuration ni al
     const before = structuredClone(state);
     expect(launchPreparation(state, actor, revision, newGameId, random)).toEqual({ ok: false, error });
     expect(state).toEqual(before);
+    expect(state.centralReserves).toBeNull();
   }
   expect(newGameId).not.toHaveBeenCalled();
   expect(random).not.toHaveBeenCalled();
@@ -337,6 +343,7 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
   try {
     const before = databaseContents(db);
     expect(ready.preparation).toBeNull();
+    expect(JSON.parse(String(before.rooms[0].snapshot)).centralReserves).toBeNull();
     const codeOnly = { code: created.session.code } as typeof created.session;
     expect(await outsider.emitWithAck('lobby:resume', codeOnly)).toEqual({ ok: false, error: 'invalid' });
     expect(await guest.emitWithAck('lobby:action', launch(ready.revision))).toEqual({ ok: false, error: 'host-required' });
@@ -344,7 +351,8 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
     const injected = { ...launch(ready.revision), actorId: created.view.you };
     expect(await host.emitWithAck('lobby:action', injected)).toEqual({ ok: false, error: 'invalid' });
     for (const extra of [{ twoPlayerSetup: expectedQuestSnapshot }, { dieResult: 3 }, { region: 'donjon-rouge' },
-      { firstBattleRoll: rollOfOne }, { individualResources: [] }, { tokenId: randomUUID() }, { bagTokenCount: 11 }]) {
+      { firstBattleRoll: rollOfOne }, { individualResources: [] }, { tokenId: randomUUID() }, { bagTokenCount: 11 },
+      { centralReserves: expectedCentralReserves(25, 3) }]) {
       const injectedResult = { ...launch(ready.revision), ...extra };
       expect(await host.emitWithAck('lobby:action', injectedResult)).toEqual({ ok: false, error: 'invalid' });
     }
@@ -394,9 +402,10 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
       initialQuests: expectedQuestZones(expectedQuestSnapshot.questOrder, 2),
       firstBattleRoll: rollOfOne,
       individualResources: expectedHoldings(snapshot, () => 0),
+      centralReserves: expectedCentralReserves(25, 3),
     });
     expect(viewFor(snapshot, randomUUID()).preparation).toBeNull();
-    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 9 });
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 10 });
     expect(persisted.sessions).toEqual(before.sessions);
     expect(persisted.receipts).toHaveLength(before.receipts.length + 1);
 
@@ -442,11 +451,11 @@ it('diffuse et persiste une seule préparation malgré deux lancements concurren
 });
 
 it.each([
-  { count: 2, openChairs: 11, activeBlockers: ['4J', '5J'], shards: [2, 1] },
-  { count: 3, openChairs: 11, activeBlockers: ['4J', '5J'], shards: [3, 2, 1] },
-  { count: 4, openChairs: 12, activeBlockers: ['5J'], shards: [3, 2, 2, 1] },
-  { count: 5, openChairs: 13, activeBlockers: [], shards: [3, 2, 2, 1, 0] },
-])('partage la dotation à $count sièges, dont le Jabberwocky, sans fuite de jetons', async ({ count, shards, ...teaTable }) => {
+  { count: 2, openChairs: 11, activeBlockers: ['4J', '5J'], shards: [2, 1], reserves: expectedCentralReserves(25, 3) },
+  { count: 3, openChairs: 11, activeBlockers: ['4J', '5J'], shards: [3, 2, 1], reserves: expectedCentralReserves(23, 2) },
+  { count: 4, openChairs: 12, activeBlockers: ['5J'], shards: [3, 2, 2, 1], reserves: expectedCentralReserves(21, 1) },
+  { count: 5, openChairs: 13, activeBlockers: [], shards: [3, 2, 2, 1, 0], reserves: expectedCentralReserves(19, 0) },
+])('conserve la dotation et les réserves à $count sièges, dont le Jabberwocky, sans fuite', async ({ count, shards, reserves, ...teaTable }) => {
   const database = tempDatabase();
   let calls = 0;
   const fraction = (i: number) => i % 2 === 0 ? 0.99 : 0;
@@ -483,8 +492,13 @@ it.each([
   }
   expect(random).not.toHaveBeenCalled();
   const request = launch(configured.revision);
-  const { view: prepared, received: allViews } = await actionWithUpdates(host, seats, request);
+  // A ready seat remains part of the launch even with no connection.
+  seats.at(-1)!.disconnect();
+  const { view: prepared, received: allViews } = await actionWithUpdates(host, seats.slice(0, -1), request);
   expect(allViews[0]).toEqual(prepared);
+  const offlineSeat = await connect(url);
+  allViews.push(success(await offlineSeat.emitWithAck('lobby:resume', sessions.at(-1)!)));
+  offlineSeat.disconnect();
   const clockwise = [...seatIds.slice(1), seatIds[0]];
   expect(publicPreparation(prepared)).toEqual({ gameId: expect.any(String), teaTable, initialLeaders: null,
     firstTeaPreview: shards.map((plannedShards, i) => ({ playerId: clockwise[i], turn: i + 1, plannedShards })),
@@ -500,6 +514,13 @@ it.each([
     expect(saved.initialQuests).toEqual(expectedQuestZones(expectedQuestSnapshot.questOrder, count));
     expect(saved.firstBattleRoll).toEqual({ dieVersion: 1, result: 2 });
     expect(saved.individualResources).toEqual(expectedHoldings(saved, fraction));
+    expect(saved.centralReserves).toStrictEqual(reserves);
+    const bags = saved.individualResources!.flatMap(({ tokenZones }) => tokenZones.bag);
+    expect(reserves.undistributedMadness.single + bags.filter(({ type }) => type === 'madness-single').length).toBe(29);
+    expect(reserves.undistributedMadness.double + bags.filter(({ type }) => type === 'madness-double').length).toBe(5);
+    expect(new Set(bags.map(({ id }) => id)).size).toBe(bags.length);
+    const { 1: ones, 5: fives } = saved.centralReserves!.shardBank;
+    expect([ones + fives, ones + 5 * fives]).toEqual([40, 80]);
   } finally { db.close(); }
   expect(random).toHaveBeenCalledTimes(launchDraws(count));
   for (const [i, current] of allViews.entries()) {
@@ -549,6 +570,7 @@ it.each(['simultanément', 'après admission'] as const)('arbitre un lancement %
       expect(current.journal).toEqual([...ready.journal, { type: 'joined', actorId: admission.value.view.you, revision: current.revision }]);
       expect(after.receipts).toEqual(before.receipts);
       expect(after.sessions).toHaveLength(before.sessions.length + 1);
+      expect(JSON.parse(String(after.rooms[0].snapshot)).centralReserves).toBeNull();
       expect(random).not.toHaveBeenCalled();
     } else {
       expect(admission).toEqual({ ok: false, error: 'room-closed' });
@@ -588,7 +610,7 @@ it.each([2, 3, 4, 5])('J et K–M à %i sièges : choix privés, signal unique e
   try {
     const before = read();
     const common = { revision: before.revision, journal: before.journal, firstBattleRoll: before.firstBattleRoll,
-      individualResources: before.individualResources, regionScores: before.regionScores };
+      individualResources: before.individualResources, regionScores: before.regionScores, centralReserves: before.centralReserves };
     const originalOffers = before.initialQuests!.seats.map((seat) => seat.type === 'offer' ? seat.cards : neverOffer());
     let expectedDeck = before.initialQuests!.deck;
     let draws = launchDraws(count);
@@ -698,7 +720,7 @@ it.each([2, 3, 4, 5])('J et K–M à %i sièges : choix privés, signal unique e
     }
     expect(databaseContents(db)).toEqual(persisted);
     expect(db.prepare('PRAGMA data_version').get()).toEqual(dataVersion);
-    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 9 });
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 10 });
     expect(random).toHaveBeenCalledTimes(draws);
   } finally { db.close(); }
 });
@@ -822,6 +844,7 @@ it.each([
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
     const before = databaseContents(db);
+    expect(JSON.parse(String(before.rooms[0].snapshot)).centralReserves).toBeNull();
     const update = vi.fn();
     guest.on('lobby:update', update);
     db.exec(`CREATE TRIGGER reject_launch ${trigger}
@@ -841,6 +864,7 @@ it.each([
     expect(view.preparation?.twoPlayerSetup?.revealedQuestTitle).toBe('Peindre les roses');
     expect(view.preparation?.firstBattle).toEqual(firstBattle(3, 'foret-de-tulgey'));
     expect(random).toHaveBeenCalledTimes(2 * launchDraws(2));
+    expect(JSON.parse(String(databaseContents(db).rooms[0].snapshot)).centralReserves).toEqual(expectedCentralReserves(25, 3));
     expect(update).toHaveBeenCalledExactlyOnceWith(guestView);
   } finally { log.mockRestore(); db.close(); }
 });
@@ -1193,9 +1217,9 @@ it('migre un salon v2 de #5 sans changer ses factions, prêts, sièges, secrets,
 
     const random = vi.fn(() => 0);
     const url = await start(database, random);
-    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
     expect(JSON.parse(String(db.prepare('SELECT snapshot FROM lobbies').get()?.snapshot)))
-      .toEqual({ ...snapshot, version: 9, firstPlayerId: null, game: null, regionScores: null, initialQuests: null, firstBattleRoll: null, individualResources: null });
+      .toEqual({ ...snapshot, version: 10, firstPlayerId: null, game: null, regionScores: null, initialQuests: null, firstBattleRoll: null, individualResources: null, centralReserves: null });
     expect({ sessions: sessions.all(), intents: intents.all() }).toEqual(before);
     const [h, g] = await Promise.all([connect(url), connect(url)]);
     const hostView = success(await h.emitWithAck('lobby:resume', hostSession));
@@ -1221,12 +1245,13 @@ it('migre un salon v3 prêt sans le lancer ni perdre J1 et les données existant
   await stop();
   const db = new DatabaseSync(database);
   try {
-    const { game, regionScores, initialQuests, firstBattleRoll, individualResources, ...open } = lobbyState.parse(JSON.parse(String(databaseContents(db).rooms[0].snapshot)));
+    const { game, regionScores, initialQuests, firstBattleRoll, individualResources, centralReserves, ...open } = lobbyState.parse(JSON.parse(String(databaseContents(db).rooms[0].snapshot)));
     expect(game).toBeNull();
     expect(regionScores).toBeNull();
     expect(initialQuests).toBeNull();
     expect(firstBattleRoll).toBeNull();
     expect(individualResources).toBeNull();
+    expect(centralReserves).toBeNull();
     const snapshot = { ...open, version: 3 };
     db.prepare('UPDATE lobbies SET snapshot = ?').run(JSON.stringify(snapshot));
     db.exec('PRAGMA user_version = 3');
@@ -1235,8 +1260,8 @@ it('migre un salon v3 prêt sans le lancer ni perdre J1 et les données existant
     const random = vi.fn(() => 0);
     const url = await start(database, random);
     const after = databaseContents(db);
-    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
-    expect(JSON.parse(String(after.rooms[0].snapshot))).toEqual({ ...snapshot, version: 9, game: null, regionScores: null, initialQuests: null, firstBattleRoll: null, individualResources: null });
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
+    expect(JSON.parse(String(after.rooms[0].snapshot))).toEqual({ ...snapshot, version: 10, game: null, regionScores: null, initialQuests: null, firstBattleRoll: null, individualResources: null, centralReserves: null });
     expect(after.sessions).toEqual(before.sessions);
     expect(after.receipts).toEqual(before.receipts);
     const [host, guest] = await Promise.all([connect(url), connect(url)]);
@@ -1278,7 +1303,7 @@ it('migre les préparations v4 une seule fois, préserve les affectations prése
     const migratedUrl = await start(database, random);
     const migrationDraws = 5 + 2 * (29 + 1 + 2 * bagDraws(2));
     expect(random).toHaveBeenCalledTimes(migrationDraws);
-    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
     const migrated = databaseContents(db);
     expect(migrated.sessions).toEqual(before.sessions);
     expect(migrated.receipts).toEqual(before.receipts);
@@ -1319,7 +1344,7 @@ it('migre les préparations v4 une seule fois, préserve les affectations prése
   } finally { db.close(); }
 });
 
-it('annule toute la chaîne v4 → v9 si les Quêtes ne peuvent pas être écrites à la dernière étape', async () => {
+it('annule la chaîne vers v10 si l’écriture des Quêtes échoue à l’étape v8 → v9', async () => {
   const database = tempDatabase();
   const { host, ready } = await readyTable(await start(database));
   success(await host.emitWithAck('lobby:action', launch(ready.revision)));
@@ -1341,7 +1366,7 @@ it('annule toute la chaîne v4 → v9 si les Quêtes ne peuvent pas être écrit
     db.exec('DROP TRIGGER reject_migration');
     await start(database, random);
     expect(random).toHaveBeenCalledTimes(2 * launchDraws(2));
-    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
   } finally { db.close(); }
 });
 
@@ -1382,7 +1407,7 @@ it('migre v5 avec un seul mélange de Quêtes par préparation, sans remélanger
     const random = vi.fn(() => 0);
     await start(database, random);
     const migrated = databaseContents(db);
-    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
     expect(migrated.sessions).toEqual(before.sessions);
     expect(migrated.receipts).toEqual(before.receipts);
     migrated.rooms.forEach(({ snapshot }, i) => { const fixture = v5[i]; expectUpgrade(lobbyState.parse(JSON.parse(String(snapshot))), lobbySnapshotV8.parse({
@@ -1464,7 +1489,7 @@ it('migre v6 : un seul lancer par préparation 2–5J, sans changer les données
     const random = vi.fn(() => 0.5);
     let migratedUrl = await start(database, random);
     const migrated = databaseContents(db);
-    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
     expect(migrated.sessions).toEqual(before.sessions);
     expect(migrated.receipts).toEqual(before.receipts);
     expect(migrated.rooms.map(({ code }) => code)).toEqual(before.rooms.map(({ code }) => code));
@@ -1539,7 +1564,7 @@ it('migre v7 → v8 sans rejouer les tirages communs, et annule toutes les écri
     const random = vi.fn(() => 0);
     const upgradedUrl = await start(database, random);
     const upgraded = databaseContents(db);
-    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
     expect(upgraded.sessions).toEqual(legacy.sessions);
     expect(upgraded.receipts).toEqual(legacy.receipts);
     const snapshots = upgraded.rooms.map(({ snapshot }) => lobbyState.parse(JSON.parse(String(snapshot))));
@@ -1609,7 +1634,7 @@ it('migre v8 → v9 sans rejouer A–I ni le retrait 2J ; rollback à la deuxiè
     const random = vi.fn(() => 0);
     const upgradedUrl = await start(database, random);
     const upgraded = databaseContents(db);
-    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+    expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
     expect(upgraded.sessions).toEqual(before.sessions);
     expect(upgraded.receipts).toEqual(before.receipts);
     expect(random).toHaveBeenCalledTimes(newQuestDrawsForAllSizes);
@@ -1637,7 +1662,136 @@ it('migre v8 → v9 sans rejouer A–I ni le retrait 2J ; rollback à la deuxiè
   } finally { db.close(); }
 });
 
-it('v9 refuse des zones ou preuves privées incohérentes et conserve une pioche courante valide', async () => {
+it('migre v9 → v10 sans hasard, en salon ouvert et avant ou après la fin de J', async () => {
+  const database = tempDatabase();
+  const url = await start(database, () => 0.99);
+  const open = await readyTable(url);
+  const launched: { sessions: Session[]; views: LobbyView[]; choices: { request: GameAction; receipt: GameReceipt }[]; launchRequest: LobbyAction }[] = [];
+  for (const count of [2, 5]) {
+    const { host, seats, sessions, ready } = await readyTable(url, count);
+    const launchRequest = launch(ready.revision);
+    const { received } = await actionWithUpdates(host, seats, launchRequest);
+    // A partially completed J (2J) and a completed J with K–M visible (5J).
+    const choices = [];
+    for (const [i, socket] of seats.slice(0, count === 2 ? 1 : count).entries()) {
+      const request = questAction(offerOf(received[i]), i % 2);
+      choices.push({ request, receipt: success(await socket.emitWithAck('setup-quest:choose', request)) });
+    }
+    const views = await Promise.all(seats.map((socket, i) => socket.emitWithAck('lobby:resume', sessions[i]).then(success)));
+    expect(views[0].preparation?.initialBets).toEqual(count === 2 ? null : FACTION_IDS.slice(1));
+    launched.push({ sessions, views, choices, launchRequest });
+  }
+  await stop();
+  const db = new DatabaseSync(database);
+  try {
+    const write = db.prepare('UPDATE lobbies SET snapshot = ? WHERE code = ?');
+    const fixtures = databaseContents(db).rooms.map(({ snapshot }) => {
+      const { centralReserves: _, ...old } = lobbyState.parse(JSON.parse(String(snapshot)));
+      // Valid, non-original orders prove migration never rebuilds the bags or deck.
+      old.individualResources?.forEach(({ tokenZones }) => tokenZones.bag.reverse());
+      old.initialQuests?.deck.reverse();
+      const fixture = lobbySnapshotV9.parse({ ...old, version: 9 });
+      write.run(JSON.stringify(fixture), fixture.code);
+      return fixture;
+    });
+    db.exec(`PRAGMA user_version = 9;
+      CREATE TRIGGER reject_second_stock BEFORE UPDATE ON lobbies
+      WHEN EXISTS (SELECT 1 FROM lobbies WHERE json_extract(snapshot, '$.version') = 10)
+      BEGIN SELECT RAISE(ABORT, 'test v10 rollback'); END`);
+    const before = databaseContents(db);
+    const random = vi.fn(() => { throw new Error('aucun tirage attendu en v9 ou v10'); });
+    expect(() => makeServer({ database, random })).toThrow('test v10 rollback');
+    expect(databaseContents(db)).toEqual(before);
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 9 });
+    db.exec('DROP TRIGGER reject_second_stock');
+
+    const fixture = fixtures.find(({ game }) => game !== null)!;
+    const corrupt = structuredClone(fixture);
+    const bag = corrupt.individualResources![0].tokenZones.bag;
+    // Same counts, but one missing instance and one duplicate: never backfill an invalid v9 bag.
+    const singles = bag.filter(({ type }) => type === 'madness-single');
+    singles[1].id = singles[0].id;
+    for (const invalid of [corrupt, { ...fixture, game: { ...fixture.game, phase: { type: 'tea', round: 1 } } }]) {
+      write.run(JSON.stringify(invalid), fixture.code);
+      const persisted = databaseContents(db);
+      expect(() => makeServer({ database, random })).toThrow();
+      expect(databaseContents(db)).toEqual(persisted);
+      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 9 });
+    }
+    write.run(JSON.stringify(fixture), fixture.code);
+
+    const verifyViews = async (address: string) => {
+      const waiting = await connect(address);
+      expect(success(await waiting.emitWithAck('lobby:resume', open.created.session))).toEqual(open.ready);
+      expect(success(await waiting.emitWithAck('lobby:action', open.choice))).toEqual(open.ready);
+      for (const { sessions, views, choices, launchRequest } of launched) {
+        const saved = fixtures.find(({ code }) => code === sessions[0].code)!;
+        for (const [i, session] of sessions.entries()) {
+          const socket = await connect(address);
+          const view = success(await socket.emitWithAck('lobby:resume', session));
+          expect(view).toStrictEqual(views[i]);
+          expectFiltered(view, ...saved.individualResources!.flatMap(({ tokenZones }) => tokenZones.bag.map(({ id }) => id)));
+          const log = vi.fn();
+          socket.onAny(log);
+          if (i === 0) expect(success(await socket.emitWithAck('lobby:action', launchRequest))).toStrictEqual(view);
+          if (choices[i]) expect(success(await socket.emitWithAck('setup-quest:choose', choices[i].request))).toStrictEqual(choices[i].receipt);
+          expect(log).not.toHaveBeenCalled();
+        }
+      }
+    };
+    await verifyViews(await start(database, random));
+    const upgraded = databaseContents(db);
+    expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 10 });
+    expect(upgraded.sessions).toEqual(before.sessions);
+    expect(upgraded.receipts).toEqual(before.receipts);
+    expect(upgraded.rooms.map(({ snapshot }) => JSON.parse(String(snapshot)))).toStrictEqual(fixtures.map((old) => ({
+      ...old, version: 10, centralReserves: !old.game ? null
+        : old.players.length === 2 ? expectedCentralReserves(25, 3) : expectedCentralReserves(19, 0),
+    })));
+    const dataVersion = db.prepare('PRAGMA data_version').get();
+    await stop();
+    await verifyViews(await start(database, random));
+    expect(databaseContents(db)).toEqual(upgraded);
+    expect(db.prepare('PRAGMA data_version').get()).toEqual(dataVersion);
+    expect(random).not.toHaveBeenCalled();
+  } finally { db.close(); }
+});
+
+it('refuse des réserves v10 absentes, superflues ou non conservées, sans réécriture', async () => {
+  const database = tempDatabase();
+  const url = await start(database, () => 0);
+  await readyTable(url);
+  const { host, ready } = await readyTable(url);
+  success(await host.emitWithAck('lobby:action', launch(ready.revision)));
+  await stop();
+  const db = new DatabaseSync(database);
+  try {
+    const random = vi.fn(() => 0);
+    const write = db.prepare('UPDATE lobbies SET snapshot = ? WHERE code = ?');
+    for (const { snapshot } of databaseContents(db).rooms) {
+      const state = lobbyState.parse(JSON.parse(String(snapshot)));
+      const reserves = expectedCentralReserves(25, 3);
+      const invalid = state.game ? [undefined, null, expectedCentralReserves(29, 5), expectedCentralReserves(24, 4),
+        expectedCentralReserves(25, -1), expectedCentralReserves(25.5, 3),
+        { ...reserves, undistributedMadness: { ...reserves.undistributedMadness, poison: 0 } },
+        { ...reserves, shardBank: { 1: 25, 5: 11 } }, // Correct total value, wrong denominations.
+        { ...reserves, shardBank: { 1: 30, 5: 10, 10: 0 } },
+        { ...reserves, firstBattleRoll: rollOfOne }, { ...reserves, balances: [] },
+      ] : [undefined, reserves];
+      for (const centralReserves of invalid) {
+        write.run(JSON.stringify({ ...state, centralReserves }), state.code);
+        const before = databaseContents(db);
+        expect(() => makeServer({ database, random })).toThrow(/centralReserves/);
+        expect(databaseContents(db)).toEqual(before);
+        expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 10 });
+      }
+      write.run(JSON.stringify(state), state.code);
+    }
+    expect(random).not.toHaveBeenCalled();
+  } finally { db.close(); }
+});
+
+it('refuse des zones ou preuves privées incohérentes et conserve une pioche courante valide', async () => {
   const database = tempDatabase();
   const { host, created, ready } = await readyTable(await start(database, () => 0));
   const prepared = success(await host.emitWithAck('lobby:action', launch(ready.revision)));
@@ -1739,7 +1893,7 @@ it('refuse une dotation A–I altérée sans réparer le multiensemble, les zone
       const before = databaseContents(db);
       expect(() => makeServer({ database, random })).toThrow(/individualResources/);
       expect(databaseContents(db)).toEqual(before);
-      expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+      expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
       write.run(JSON.stringify(snapshot), snapshot.code);
     }
     // A different valid permutation is authoritative, not regenerated or normalized.
@@ -1752,7 +1906,7 @@ it('refuse une dotation A–I altérée sans réparer le multiensemble, les zone
   } finally { db.close(); }
 });
 
-it('ne répare jamais un lancer absent, invalide ou enregistré dans un salon ouvert en v9', async () => {
+it('ne répare jamais un lancer absent, invalide ou enregistré dans un salon ouvert', async () => {
   const database = tempDatabase();
   const url = await start(database, () => 0);
   const open = await readyTable(url);
@@ -1775,7 +1929,7 @@ it('ne répare jamais un lancer absent, invalide ou enregistré dans un salon ou
         const before = databaseContents(db);
         expect(() => makeServer({ database, random })).toThrow(/firstBattleRoll/);
         expect(databaseContents(db)).toEqual(before);
-        expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(9);
+        expect(db.prepare('PRAGMA user_version').get()?.user_version).toBe(10);
       }
       write.run(JSON.stringify(snapshot), snapshot.code);
     }
@@ -1851,7 +2005,7 @@ it('efface et sauvegarde un J1 devenu orphelin lors de la restauration v3, sans 
     expect(await returned.emitWithAck('lobby:action', selectFirstPlayer(view.you, restored.revision)))
       .toEqual({ ok: false, error: 'seat-not-found' });
     expect(JSON.parse(String(db.prepare('SELECT snapshot FROM lobbies').get()?.snapshot)))
-      .toEqual({ ...snapshot, version: 9, game: null, regionScores: null, initialQuests: null, firstBattleRoll: null, individualResources: null,
+      .toEqual({ ...snapshot, version: 10, game: null, regionScores: null, initialQuests: null, firstBattleRoll: null, individualResources: null, centralReserves: null,
         firstPlayerId: null, revision: restored.revision, journal: restored.journal });
     await stop();
     const reopened = await connect(await start(database));
