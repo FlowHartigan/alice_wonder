@@ -14,6 +14,7 @@ export * from './battle.ts';
 export * from './first-battle-region.ts';
 export * from './game.ts';
 export * from './initial-quests.ts';
+export * from './market-setup.ts';
 export * from './region-score-markers.ts';
 export * from './starting-shards.ts';
 export * from './tea-setup.ts';

@@ -40,6 +40,11 @@ v11 → v12 valide le schéma historique strict et le code du salon puis modifie
 - En `setup`, le moteur dérive la disposition de `GameState.playerIds`, la liste figée des sièges admis, jamais des connexions. `viewFor` expose `preparation.teaTable` (`openChairs`, `activeBlockers`) aux sièges autorisés. Le calcul est identique à chaque projection, y compris après restauration : les chaises ne nécessitent aucune donnée persistée supplémentaire.
 - React rend le résumé textuel et superpose les badges fournis par le serveur sur une image proportionnelle non interactive. Vite importe directement le [WebP officiel](../LICENSES.md#plateau-central-fr), sans fichier source dupliqué ; l'image est un asset statique, pas une donnée de partie. Aucun calcul de règle côté client. Cet aperçu ne lance pas le Thé et ne remplace ni la préparation commune complète (#12) ni le futur plateau interactif (#15).
 
+### Pose initiale du marché au moteur (#94)
+
+- `prepareInitialMarket` reçoit un lot interne déjà ordonné (et déjà filtré à 2J), sans dépendre de l'état du jeu ni d'une source de hasard. Il valide les cartes et les pièces du lot entier avant de former `market.placements` (trois emplacements logiques) et `reserves` (pioche ordonnée et matériel rattaché, stockés séparément).
+- La sortie reste interne au moteur, y compris les objets des placements visibles. Une future projection devra sélectionner les données à montrer et ne jamais transmettre les réserves. Le catalogue par exemplaire et les exclusions sont à établir en [#9](https://github.com/FlowHartigan/alice_wonder/issues/9) avant le branchement [#12](https://github.com/FlowHartigan/alice_wonder/issues/12) ; aucun changement du lancement, des vues, de la persistance ni de l'ordre du hasard.
+
 ### Préparation des paquets du Thé au moteur (#92)
 
 - `prepareInitialTea` prend l'effectif figé et les trois inventaires internes sans lire de `GameState`. Il les valide avant de consommer 87 valeurs de la source injectée dans l'ordre I → II → III. Le calcul de disposition est partagé avec `teaTableForSetup` (#54). Les [indices techniques](../rules.md#préparation-des-paquets-du-thé-au-moteur) ne représentent pas le circuit physique.
