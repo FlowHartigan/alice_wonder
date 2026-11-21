@@ -101,6 +101,10 @@ it.each([
   const launched = run(() => 0);
   expect(run(() => 0)).toEqual(launched);
   expect(state.individualResources).toBeNull();
+  expect(state.centralReserves).toBeNull();
+  expect(launched.centralReserves).toEqual({
+    undistributedMadness: { single: 29 - 2 * count, double: 5 - count }, shardBank: { 1: 30, 5: 10 },
+  });
   expect({ ...launched.game, decisions: [] }).toEqual(initializeGame(gameId, players.map(({ id }) => id)));
   expect(launched.game?.decisions).toHaveLength(count);
   const allIds: string[] = [];
