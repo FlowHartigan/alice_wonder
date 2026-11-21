@@ -59,4 +59,6 @@ npx playwright install chromium firefox
 npm run test:e2e
 ```
 
+Sur chaque pull request, la [CI GitHub Actions](.github/workflows/ci.yml) lance ces contrôles sous Ubuntu avec Node.js 24 après `npm ci`. Le build inclut le typage TypeScript. En cas d’échec des parcours navigateur, télécharger l’artefact `playwright-diagnostics` depuis le run (conservé 7 jours). Après extraction, ouvrir le rapport avec `npx playwright show-report playwright-report` pour consulter les erreurs et les traces disponibles.
+
 [Architecture](docs/architecture.md) · [Décisions](docs/decisions.md) · [Couverture des règles](docs/rules-coverage.md)
