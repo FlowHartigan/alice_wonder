@@ -228,7 +228,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await page.goto(`http://127.0.0.1:${address.port}`);
       await page.getByLabel('Votre nom').fill('Camille');
       await page.getByRole('button', { name: 'Créer le salon' }).click();
-      await expect(page.getByRole('heading', { name: 'Invitation' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Invitation' }), 'Régression contrôlée #3 : le titre Invitation est visible').toBeHidden();
       const hostFirst = page.getByRole('region', { name: 'Premier joueur' });
       const chooseHost = hostFirst.getByRole('button', { name: 'Camille (siège 1)' });
       await expect(hostFirst.getByText('La personne qui a bu du thé le plus récemment commence.')).toBeVisible();
