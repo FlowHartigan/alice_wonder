@@ -63,6 +63,8 @@ Voir la [matrice de couverture et la recette documentaire 2–5J](docs/rules-cov
 
 La fiche commerciale agrège « 254 pions » sans ventilation et classe les 24 cartes Pays des Merveilles sous « Habitants ». Pour préparer la partie, utiliser le détail p. 2–3 et la distinction Habitant/Objet p. 8 ; ne pas déduire d'un total commercial une pièce supplémentaire ou une correspondance carte–silhouette. **Non validés :** le catalogue par exemplaire (dont la ventilation faible/fort des Alliés) et les correspondances exactes carte–pièces.
 
+Marché FR : voir la [matrice des attestations des cartes et des pièces](docs/marche-fr/matrice.md) et le [relevé de boîte à compléter](docs/marche-fr/releve.md) ([#96](https://github.com/FlowHartigan/alice_wonder/issues/96)). Les illustrations ne valent ni exemplaires ni paires contrôlés.
+
 **Contrôle :** pour chaque effectif, rapprocher les lots distribués, réservés et écartés de l'inventaire ; garder les Éclats, la Folie et le Poison dans trois catégories distinctes.
 
 ### WW-SETUP-002 — Choix des factions
@@ -159,6 +161,8 @@ Avant toute partition, le moteur vérifie le format du lot entier, la catégorie
 Le moteur place les trois premières cartes face visible aux indices logiques 0, 1 et 2, sans coordonnées, avec leurs seules pièces. Le suffixe reste dans son ordre en pioche privée (19 ou 21 cartes) ; ses pièces sont conservées dans une réserve privée distincte et restent rattachées par `cardId`. Les deux partitions conservent toutes les instances reçues, sans mutation, perte ni duplication. Rien n'est posé en Région, dans un sac ou dans une autre zone. Le résultat reste interne ; voir la [recette](docs/rules-coverage.md#recette-de-la-pose-initiale-du-marché).
 
 À 2J, l'appelant garantit que le lot reçu ne contient ni les deux exclusions de `WW-COUNT-001` ni leurs pièces ; la conservation porte uniquement sur ce lot. Cela ne fixe pas la chronologie réelle des opérations ni le sort du matériel déjà révélé. Le branchement en [#12](https://github.com/FlowHartigan/alice_wonder/issues/12) attend le catalogue FR autorisé et vérifié par exemplaire de [#9](https://github.com/FlowHartigan/alice_wonder/issues/9) : catégories, correspondances carte–pièces et identification des exclusions. Un futur mélange à 3–5J réutilisera le mélange existant avec une source injectée, après validation du lot ; le présent incrément ne le raccorde pas et ne change pas l'ordre actuel du hasard. Aucun réapprovisionnement, effet, signal de préparation commune prête, transfert N ou ouverture du Thé.
+
+Voir le [dossier de preuves partielles FR](docs/marche-fr/README.md) et le [registre des écarts au contrat à vérifier](docs/marche-fr/controle.md#registre-des-lacunes-et-divergences) : ni le contrat ni les tests synthétiques ne prouvent les rattachements réels.
 
 #### Préparation des paquets du Thé au moteur
 
@@ -351,6 +355,8 @@ Source et tests : ...
 
 **Dossier Thé I ([#83](https://github.com/FlowHartigan/alice_wonder/issues/83)).** Les [illustrations FR annotées](docs/the-i/README.md#ce-que-le-livret-fr-atteste) servent à comparer les groupes de pictogrammes, pas à confirmer les effets en jeu (`WW-TEA-002`) ni à composer un paquet.
 
+**Dossier marché FR ([#96](https://github.com/FlowHartigan/alice_wonder/issues/96)).** La [matrice](docs/marche-fr/matrice.md#cartes-et-mentions) sépare noms, catégories, rectos et indices d'appariement ; aucun effet ni exemplaire FR n'est vérifié par ces illustrations.
+
 **WW-QUEST-001** — **Validée pour le choix et la confidentialité en préparation seulement** (FR p. 5 J et p. 14 « Quêtes », [#14](https://github.com/FlowHartigan/alice_wonder/issues/14)) : offres et carte gardée dans le journal privé, sans événement public de choix. Le titre de la carte déjà révélée pour le retrait 2J reste public aux sièges admis (`WW-COUNT-001`). **À vérifier pour les effets en jeu**, p. 8, 14–15, 20 et 22 : annoncer au plus un Exploit admissible à la fin d'un combat et révéler sa carte (exceptions par capacité) ; évaluer les Objectifs en fin de partie, jetons dans sac, Actifs, Épuisés et Forge, et possibilité qu'un même élément satisfasse plusieurs Objectifs. Voir `WW-END-001` pour le score. Textes d'aide non officiels seulement ; pas de calcul ni de visuel de Quête.
 
 **WW-UPGRADE-001** — À vérifier, p. 15 et 20–22. À la fin d'un combat éligible, la case de Force Forge et les jetons Forge actifs donnent des occasions facultatives. Déplacer un jeton Actif vers la première case libre d'une piste choisie, appliquer sa récompense et gagner l'Artefact si la piste est complétée. Vérifier les récompenses partagées entre deux pistes et les interactions lorsque le jeton forgé est une Forge.
@@ -378,6 +384,8 @@ Source et tests : ...
 - **Plateaux et ressources :** bloquer les deux chaises 4J/5J ; prendre la face au cadre doré « 2 JOUEURS » en bas à gauche. Ajouter un jeton Forge dans chaque sac, ne distribuer aucune carte Pari, donner 4 Poison si le Jabberwocky joue et appliquer la ligne d'Éclats 2/1. Réserver le cube d'une faction non jouée pour la Résistance locale ; les deux cubes des joueurs vont sur Combat 0. Le cube réservé est posé sur **3 / 5 / 7** au début de la Guerre du round I / II / III, pas au départ du Thé I (p. 21).
 
 **Marché au moteur ([#94](https://github.com/FlowHartigan/alice_wonder/issues/94)) :** la [pose pure](#pose-initiale-du-marché-au-moteur) attend 22 cartes déjà filtrées et mélangées, matériel des exclusions absent. Elle ne vérifie pas le nom des exclusions, n'effectue aucun retrait et n'active pas le marché en partie.
+
+Voir l'[analyse documentaire du retrait du marché](docs/marche-fr/retrait-2j.md), distincte du retrait régional ; les questions sur le mélange, le complément du marché et le rangement des pièces restent ouvertes.
 
 **Contrôle de préparation :** avec le Donjon rouge révélé et un dé de 2, partir de la Forêt de Tulgey et finir à la Mare de Larmes ; après le Comté, le circuit reprend à la Forêt. Vérifier le résultat des exclusions au marché et dans les Quêtes, les faces 2J, le cube distinct, les 11 jetons par sac et l'absence de cartes Pari. Le relevé des cinq faces et le nombre de Quêtes à retirer par Région nécessitent un catalogue FR ; l'adjacence pour les effets hors circuit des combats n'est pas déduite du saut de Région.
 
@@ -431,7 +439,7 @@ Sur les 13 chaises du plateau, bloquer celles indiquées ci-dessous. Les chiffre
 
 **Contrôle :** refaire la préparation avec la même série A à 3, 4 puis 5 : retirer un bloqueur à chaque incrément, ajouter une carte Thé I visible, conserver 5 Régions et le même sac par personne. Vérifier séparément les trois lignes d'Éclats et le Poison de 5 à 7.
 
-**Marché :** les tests de [pose initiale](docs/rules-coverage.md#recette-de-la-pose-initiale-du-marché) couvrent le bilan visible/pioche aux quatre effectifs sur des lots synthétiques. Ce bilan ne fixe aucun total par catégorie ni aucune ventilation du matériel exposé.
+**Marché :** les tests de [pose initiale](docs/rules-coverage.md#recette-de-la-pose-initiale-du-marché) couvrent le bilan visible/pioche aux quatre effectifs sur des lots synthétiques. Ce bilan ne fixe aucun total par catégorie ni aucune ventilation du matériel exposé ; voir le [contrôle documentaire FR](docs/marche-fr/controle.md#contrôle-documentaire-effectué).
 
 ## 11. Interface et automatisations dérivées des règles
 
@@ -450,7 +458,7 @@ Pour chaque action jouable, l'implémentation doit préciser :
 3. Les illustrations et ressources du jeu sont-elles disponibles avec une autorisation d'usage numérique ?
 4. Lucky Duck Games signale-t-il un erratum pour le tirage FR relevé ? Aucun applicable n'a été trouvé dans les sources consultées (§0).
 5. Quels textes et traductions doivent être utilisés dans l'interface ?
-6. À 2J, quand retirer les deux cartes du marché par rapport aux étapes 4–5 ? Voir `WW-SETUP-004` et `WW-COUNT-001`.
+6. À 2J, quand retirer les deux cartes du marché par rapport aux étapes 4–5 ? Voir `WW-SETUP-004`, `WW-COUNT-001` et les [questions ouvertes sur le retrait](docs/marche-fr/retrait-2j.md#questions-pour-le-propriétaire-du-projet).
 7. Quelles sont les six faces du dé Éclat FR, répétitions comprises ? L'[arbitrage web pour Premier combat](#région-de-premier-combat-au-moteur) ne tranche pas cette question matérielle.
 
 ## 13. Tableau de suivi
