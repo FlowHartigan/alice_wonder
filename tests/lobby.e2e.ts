@@ -22,6 +22,7 @@ const phaseReference = (page: Page) => page.getByRole('region', { name: 'Aide de
 const leadersList = (page: Page) => page.getByRole('list', { name: 'Chefs en Bout de Table' });
 const leaderGroup = (page: Page) => page.locator('.board-leader-group');
 const allyLinkName = 'Tableau des Alliés A–D (livret officiel FR, p. 9)';
+const seriesPanel = (page: Page) => page.getByRole('region', { name: 'Série des Alliés', exact: true });
 const rulebook = 'https://luckyduckgames.com/france/index.php?controller=attachment&id_attachment=1416';
 const deferredRemoval = /la Région désignée par la Quête et son marqueur seront retirés à une étape ultérieure/;
 const reveal = 'Quête révélée : Remporter le croquet du Jardin. Région hors jeu : Jardin des Fleurs vivantes.';
@@ -47,8 +48,6 @@ async function checkPhaseReference(player: Page) {
   const aide = phaseReference(player);
   await expect(aide.getByRole('heading', { level: 4 })).toHaveText(['Thé — livret FR, p. 7', 'Guerre — livret FR, p. 12']);
   await expect(aide.getByRole('link', { name: /exceptions à deux joueurs/ })).toHaveAttribute('href', `${rulebook}#page=21`);
-  await expect(aide.getByRole('link', { name: allyLinkName })).toHaveAttribute('href', `${rulebook}#page=9`);
-  await expect(aide).toContainText('Aucune série d’Alliés active n’est encore configurée.');
   await expect(aide.locator('button, input, select, textarea')).toHaveCount(0);
   await expect(player.getByRole('region', { name: 'Préparation de la partie' }).getByRole('button')).toHaveCount(0);
 }
@@ -246,6 +245,25 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await guest.getByLabel('Votre nom').fill('Dinah');
       await guest.getByRole('button', { name: 'Rejoindre le salon' }).click();
       const guestFirst = guest.getByRole('region', { name: 'Premier joueur' });
+      const hostSeries = seriesPanel(page);
+      const guestSeries = seriesPanel(guest);
+      const seriesSelect = hostSeries.getByRole('combobox', { name: 'Série retenue' });
+      const confirmSeries = hostSeries.getByRole('button', { name: 'Confirmer la série' });
+      await expect(seriesSelect).toHaveValue('');
+      await expect(seriesSelect.getByRole('option')).toHaveText(['Choisir une série', 'A', 'B', 'C', 'D']);
+      await expect(seriesSelect).toHaveAccessibleDescription(/Après accord de la table.*facultatif/);
+      await expect(confirmSeries).toBeDisabled();
+      await expect(guestSeries.getByRole('status')).toHaveText('Série non choisie');
+      await expect(guestSeries.locator('button, select')).toHaveCount(0);
+      await expect(guestSeries.getByRole('link', { name: allyLinkName })).toHaveAttribute('href', `${rulebook}#page=9`);
+      await seriesSelect.focus();
+      await page.keyboard.press('End');
+      await expect(seriesSelect).toHaveValue('D');
+      for (const panel of [hostSeries, guestSeries]) await expect(panel.getByRole('status')).toHaveText('Série non choisie');
+      await page.keyboard.press('Tab');
+      await expect(confirmSeries).toBeFocused();
+      await page.keyboard.press('Enter');
+      for (const panel of [hostSeries, guestSeries]) await expect(panel.getByRole('status')).toHaveText('Série choisie : D');
       const chooseGuest = hostFirst.getByRole('button', { name: 'Dinah (siège 2)' });
       await expect(guestFirst.getByRole('status')).toHaveText('Aucun premier joueur désigné.');
       await expect(guestFirst.getByText('La personne qui a bu du thé le plus récemment commence.')).toBeVisible();
@@ -282,6 +300,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(page.getByText('Dinah est prêt.')).toBeVisible();
 
       await Promise.all([page.reload(), guest.reload()]);
+      for (const panel of [hostSeries, guestSeries]) await expect(panel.getByRole('status')).toHaveText('Série choisie : D');
       await expect(guest.getByRole('button', { name: 'Retirer mon statut prêt' })).toBeEnabled();
       await expect(guestAlice).toHaveAttribute('aria-pressed', 'true');
       await expect(guest.getByText('Dinah est prêt.')).toHaveCount(1);
@@ -338,6 +357,8 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
           await expect(seats.nth(1)).toContainText(/Dinah \(siège 2\).*Jabberwocky.*Premier joueur \(J1\)/);
           await expect(player.getByRole('region', { name: 'Votre faction' })).toHaveCount(0);
           await expect(player.getByRole('region', { name: 'Premier joueur' })).toHaveCount(0);
+          await expect(seriesPanel(player).getByRole('status')).toHaveText('Série choisie : D');
+          await expect(seriesPanel(player).locator('button, select')).toHaveCount(0);
           await expect(player.getByRole('button', { name: 'Lancer la préparation' })).toHaveCount(0);
           await expect(player.getByText('Camille a lancé la préparation.')).toHaveCount(1);
           await checkFirstTea(player, [['Dinah (siège 2)', '2'], ['Camille (siège 1)', '1']]);
@@ -363,7 +384,7 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(guestQuest.getByRole('heading', { level: 4 })).toHaveText(guestTitles);
       for (const title of hostTitles) await expect(guest.getByText(title, { exact: true })).toHaveCount(0);
       for (const title of guestTitles) await expect(page.getByText(title, { exact: true })).toHaveCount(0);
-      for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
+      for (let i = 0; i < 4; i++) await page.keyboard.press('Tab');
       await expect(page.getByRole('table', { name: scoreCaption })).toBeFocused();
       await Promise.all([page.reload(), guest.reload()]);
       await checkPreparation();
@@ -435,14 +456,15 @@ test('Chromium lance la préparation avec Firefox ; seuls les sièges admis la r
       await expect(newcomer.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
       await expect(newcomer.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
       await expect(questPanel(newcomer)).toHaveCount(0);
+      await expect(seriesPanel(newcomer)).toHaveCount(0);
       await checkNoLateSetup(newcomer);
       await expect(newcomer.getByRole('img', { name: /Plateau central officiel en français/ })).toHaveCount(0);
       await expect(newcomer.getByText(/Quête révélée|Région hors jeu|Premier combat|Dé Éclat/)).toHaveCount(0);
       // Exercise the native link with the keyboard without depending on an external PDF viewer.
       await page.route(rulebook, (route) => route.fulfill({ contentType: 'text/plain', body: 'Livret FR' }));
-      await page.getByRole('table', { name: scoreCaption }).focus();
-      await page.keyboard.press('Shift+Tab');
-      await expect(phaseReference(page).getByRole('link', { name: allyLinkName })).toBeFocused();
+      await page.getByRole('heading', { name: 'Préparation de la partie' }).focus();
+      await page.keyboard.press('Tab');
+      await expect(seriesPanel(page).getByRole('link', { name: allyLinkName })).toBeFocused();
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(`${rulebook}#page=9`);
       expect(draws).toBe(35 + 2 * 10 + 20 + 21); // Chaque retour agrandit la pioche avant son mélange.
@@ -519,9 +541,11 @@ async function checkMultiseatSetup(page: Page, count: number) {
     random: () => ++draws === 35 ? 0.5 : 0 }); // Le dé suit aussi le mélange de Quêtes à 3–5J.
   const clients: Socket<ServerEvents, ClientEvents>[] = [];
   const guests: { session: Session; id: string }[] = [];
+  const lobbyViews = new Map<string, LobbyView>();
   const preparedViews = new Map<string, LobbyView>();
   function recordPreparation(view: LobbyView) {
     if (view.preparation) preparedViews.set(view.you, view);
+    else lobbyViews.set(view.you, view);
   }
   function success<T>(reply: Reply<T>): T {
     if (!reply.ok) throw new Error(reply.error);
@@ -560,9 +584,17 @@ async function checkMultiseatSetup(page: Page, count: number) {
     await expect(page.getByRole('table', { name: firstTeaCaption })).toHaveCount(0);
     await expect(page.getByRole('region', { name: resourcesTitle })).toHaveCount(0);
     await expect(shardsWaiting(page)).toHaveCount(0);
+    await expect(seriesPanel(page).getByRole('status')).toHaveText('Série non choisie');
+    await expect(seriesPanel(page).getByRole('combobox')).toHaveValue('');
+    await expect(page.getByRole('button', { name: 'Lancer la préparation' })).toBeEnabled();
+    await expect.poll(() => guests.map(({ id }) => lobbyViews.get(id))).toEqual(guests.map(() => expect.objectContaining({
+      firstPlayerId: guests[1].id, allySeries: null, canSelectAllySeries: false,
+    })));
     await page.getByRole('button', { name: 'Lancer la préparation' }).click();
     await expect(page.getByRole('heading', { name: 'Préparation de la partie' })).toBeFocused();
-    for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
+    await expect(seriesPanel(page).getByRole('status')).toHaveText('Série non choisie');
+    await expect(seriesPanel(page).locator('button, select')).toHaveCount(0);
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Tab');
     await expect(page.getByRole('table', { name: scoreCaption })).toBeFocused();
     const preview = page.getByRole('region', { name: previewTitle });
     await expect(preview.getByText(`${count + 8} chaises ouvertes.`, { exact: false })).toBeVisible();
@@ -601,7 +633,9 @@ async function checkMultiseatSetup(page: Page, count: number) {
     await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText(ownTitles);
     const distinctTitles = new Set(ownTitles);
     for (const { id } of guests) {
-      const preparation = preparedViews.get(id)?.preparation;
+      const view = preparedViews.get(id);
+      expect(view).toMatchObject({ allySeries: null, canSelectAllySeries: false });
+      const preparation = view?.preparation;
       expect(preparation).toEqual({ ...shared, initialQuest: preparation?.initialQuest });
       expect(preparation?.individualResources).toStrictEqual(expectedResources);
       const offer = preparation?.initialQuest;
@@ -616,6 +650,7 @@ async function checkMultiseatSetup(page: Page, count: number) {
 
     clients[1].disconnect();
     await page.reload();
+    await expect(seriesPanel(page).getByRole('status')).toHaveText('Série non choisie');
     await checkFirstTea(page, expected);
     await checkIndividualResources(page, resources.slice(0, count));
     await checkFirstBattle(page, garden);
@@ -623,9 +658,14 @@ async function checkMultiseatSetup(page: Page, count: number) {
     const returned: Socket<ServerEvents, ClientEvents> = io(url, { forceNew: true, ackTimeout: 2000, transports: ['websocket'] });
     clients.push(returned);
     returned.on('lobby:update', recordPreparation);
-    const resumed = success(await returned.emitWithAck('lobby:resume', secondGuest.session)).preparation;
-    expect(resumed).toEqual(preparedViews.get(secondGuest.id)?.preparation);
-    expect(resumed?.individualResources).toStrictEqual(expectedResources);
+    const resumed = success(await returned.emitWithAck('lobby:resume', secondGuest.session));
+    expect(resumed).toEqual(preparedViews.get(secondGuest.id));
+    expect(resumed).toMatchObject({ allySeries: null, canSelectAllySeries: false });
+    expect(resumed.preparation?.individualResources).toStrictEqual(expectedResources);
+    for (const [i, { id, session }] of guests.entries()) {
+      if (i === 1) continue; // Already checked on a replacement connection above.
+      expect(success(await clients[i].emitWithAck('lobby:resume', session))).toEqual(preparedViews.get(id));
+    }
     await expect(questPanel(page).getByRole('heading', { level: 4 })).toHaveText(ownTitles);
 
     const guestSockets = clients.slice(0, count - 1).map((socket, i) => i === 1 ? returned : socket);

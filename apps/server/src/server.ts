@@ -49,7 +49,9 @@ export function makeServer(options: { database: string; webRoot?: string; public
     for (const socketId of io.of('/').adapter.rooms.get(channel(state.code)) ?? []) {
       const target = io.of('/').sockets.get(socketId);
       const seat = target?.data.seat;
-      if (seat?.code === state.code && (!state.game || state.game.playerIds.includes(seat.playerId))) {
+      if (seat?.code === state.code && (state.game
+        ? state.game.playerIds.includes(seat.playerId)
+        : state.players.some(({ id }) => id === seat.playerId))) {
         target?.emit('lobby:update', viewFor(state, seat.playerId));
       }
     }

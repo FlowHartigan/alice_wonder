@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { lobbyWithScores, validInitialPreparation, validPreparationWithScores } from './index.ts';
+import { allySeriesLetter, lobbyJournal, lobbyWithScores, validInitialPreparation, validPreparationWithScores } from './index.ts';
 import { initialQuestsSnapshot, matchesInitialQuests } from './initial-quests.ts';
 import { initialResourcesSnapshot, matchesStartingSeat, startingSeatResources } from './initial-resources.ts';
 import { centralReservesSnapshot, centralReservesSnapshotV10, countInitialCentralReserves, matchesForgeReserve } from './central-reserves.ts';
@@ -57,6 +57,7 @@ function matchesFirstPlayer({ firstPlayerId, players }: Pick<LobbySnapshotV8, 'f
 }
 
 const lobbyWithInitialQuests = lobbyWithScores.extend({
+  journal: lobbyJournal,
   firstBattleRoll: firstBattleRoll.nullable(),
   individualResources: initialResourcesSnapshot.nullable(), initialQuests: initialQuestsSnapshot.nullable(),
 }).refine(validPreparationWithScores, 'Sièges ou état de préparation incohérents')
@@ -67,7 +68,9 @@ const lobbyWithInitialQuests = lobbyWithScores.extend({
   .refine(({ game, initialQuests }) => matchesInitialQuests(game, initialQuests), {
     message: 'Zones ou décisions de Quêtes initiales incohérentes', path: ['initialQuests'],
   });
-export const lobbySnapshotV9 = lobbyWithInitialQuests.safeExtend({ version: z.literal(9) });
+// Keep legacy event contracts strict even though the shared preparation refinements now accept v12 events.
+const historicalJournal = lobbyWithScores.shape.journal;
+export const lobbySnapshotV9 = lobbyWithInitialQuests.safeExtend({ version: z.literal(9), journal: historicalJournal });
 export type LobbySnapshotV9 = z.infer<typeof lobbySnapshotV9>;
 
 const reservesError = { message: 'Réserves centrales incohérentes avec les sacs ou la phase', path: ['centralReserves'] };
@@ -80,11 +83,17 @@ const lobbyWithCentralReserves = lobbyWithInitialQuests.safeExtend({
   return centralReserves !== null && centralReserves.undistributedMadness.single === undistributedMadness.single
     && centralReserves.undistributedMadness.double === undistributedMadness.double;
 }, reservesError);
-export const lobbySnapshotV10 = lobbyWithCentralReserves.safeExtend({ version: z.literal(10) });
+export const lobbySnapshotV10 = lobbyWithCentralReserves.safeExtend({ version: z.literal(10), journal: historicalJournal });
 export type LobbySnapshotV10 = z.infer<typeof lobbySnapshotV10>;
 
-export const lobbyState = lobbyWithCentralReserves.safeExtend({
-  version: z.literal(11), centralReserves: centralReservesSnapshot.nullable(),
+const lobbyWithAllyStock = lobbyWithCentralReserves.safeExtend({
+  centralReserves: centralReservesSnapshot.nullable(),
 }).refine(({ individualResources, centralReserves }) => !individualResources || (centralReserves !== null
   && matchesForgeReserve(individualResources, centralReserves.forgeReserve)), reservesError);
+export const lobbySnapshotV11 = lobbyWithAllyStock.safeExtend({ version: z.literal(11), journal: historicalJournal });
+export type LobbySnapshotV11 = z.infer<typeof lobbySnapshotV11>;
+
+export const lobbyState = lobbyWithAllyStock.safeExtend({
+  version: z.literal(12), allySeries: allySeriesLetter.nullable(),
+});
 export type LobbyState = z.infer<typeof lobbyState>;

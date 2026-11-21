@@ -5,6 +5,7 @@ import { io } from 'socket.io-client';
 import type { Socket } from 'socket.io-client';
 import { credentials, FACTION_NAMES, MAX_PLAYERS, MIN_PLAYERS, roomCode } from '@wonderland/shared';
 import type { ClientEvents, ErrorCode, IndividualResourcesSetupView, InitialQuestView, LobbyAction, LobbyView, ServerEvents, Session } from '@wonderland/shared';
+import { AllySeriesChoice } from './AllySeriesChoice.tsx';
 import { BoardPreview } from './BoardPreview.tsx';
 import { InitialQuest } from './InitialQuest.tsx';
 import { SetupPhaseReference } from './SetupPhaseReference.tsx';
@@ -112,6 +113,7 @@ function journalEntry(item: LobbyView['journal'][number], players: LobbyView['pl
   }
   const actor = players.find((p) => p.id === item.actorId)?.name ?? 'Un joueur';
   if (item.type === 'launch-preparation') return <><strong>{actor}</strong> a lancé la préparation.</>;
+  if (item.type === 'select-ally-series') return <><strong>{actor}</strong> a confirmé la série des Alliés {item.allySeries}.</>;
   if (item.type === 'select-faction') {
     const choice = item.previousFaction
       ? `a remplacé ${FACTION_NAMES[item.previousFaction]} par ${FACTION_NAMES[item.faction]}.`
@@ -259,6 +261,8 @@ function App() {
 
   const disabled = pending || connection !== 'online';
   const blockers = view?.launch?.blockers;
+  const allySeries = view && <AllySeriesChoice view={view} disabled={disabled}
+    choose={(allySeries) => sendAction({ type: 'select-ally-series', allySeries }, view.revision)} />;
   const connectionLabel = { waiting: 'Connexion en cours', online: 'Connecté', offline: 'Déconnecté' }[connection];
   return <main>
     <header className="hero">
@@ -287,6 +291,7 @@ function App() {
       {preparation ? <section className="panel preparation" aria-labelledby="preparation">
         <h2 id="preparation" ref={preparationTitle} tabIndex={-1}>Préparation de la partie</h2>
         <p><strong>Admissions fermées.</strong> Les sièges et la configuration sont figés. Les joueurs déjà admis peuvent reprendre leur place avec ce même lien.</p>
+        {allySeries}
         <p>Salon <strong>{view.code}</strong> · {view.players.length} joueurs</p>
         <ul className="players" aria-label="Sièges et factions de la préparation">
           {view.players.map((p, index) => <li key={p.id}>
@@ -386,11 +391,13 @@ function App() {
         </> : <p>Seul l’hôte peut désigner le premier joueur.</p>}
       </section>
 
+      {allySeries}
+
       {blockers && <section className="panel launch" aria-labelledby="launch">
         <h2 id="launch">Lancement</h2>
         <div id="launch-conditions" aria-live="polite">
           {blockers.length > 0 ? <ul>{blockers.map((reason) => <li key={reason}>{messages[reason]}</li>)}</ul>
-            : <p>Tout est prêt. Le lancement fermera les admissions et figera les choix.</p>}
+            : <p>La préparation partielle peut être lancée. Le lancement fermera les admissions et figera les choix.</p>}
         </div>
         <button type="button" disabled={disabled || blockers.length > 0} aria-describedby="launch-conditions"
           onClick={() => sendAction({ type: 'launch-preparation' }, view.revision)}>Lancer la préparation</button>

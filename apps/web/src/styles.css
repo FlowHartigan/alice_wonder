@@ -28,8 +28,8 @@ p { margin: .7rem 0; }
 .journal ol { margin-bottom: 0; overflow: auto; max-height: 12rem; }
 .journal li + li { margin-top: .3rem; }
 label { display: block; margin: 1rem 0; }
-input, button { font: inherit; border-radius: .45rem; }
-input { display: block; width: 100%; margin-top: .35rem; padding: .6rem; border: 1px solid #8d769a; background: #17101e; color: #fff5e9; }
+input, select, button { font: inherit; border-radius: .45rem; }
+input, select { display: block; width: 100%; margin-top: .35rem; padding: .6rem; border: 1px solid #8d769a; background: #17101e; color: #fff5e9; }
 button { border: 1px solid transparent; background: #f1c774; color: #201521; padding: .55rem .85rem; font-weight: 700; cursor: pointer; }
 button:not(:disabled):hover { background: #ffda93; }
 button.secondary { background: transparent; border-color: #8d769a; color: #fbeddc; }

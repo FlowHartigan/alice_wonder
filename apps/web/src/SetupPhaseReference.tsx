@@ -15,7 +15,5 @@ export function SetupPhaseReference() {
       La Folie peut coûter des unités ; si le combat continue, les joueurs encore en lice peuvent repiocher ou abandonner.</p>
     <p>À deux joueurs, la Région écartée est ignorée, la Résistance locale intervient même face à une seule faction et il n’y a pas de Paris.
       Voir les <a href={`${rulebook}#page=21`}>exceptions à deux joueurs (livret FR, p. 21)</a>.</p>
-    <p><a href={`${rulebook}#page=9`}>Tableau des Alliés A–D (livret officiel FR, p. 9)</a> — consultation uniquement.
-      Aucune série d’Alliés active n’est encore configurée.</p>
   </section>;
 }

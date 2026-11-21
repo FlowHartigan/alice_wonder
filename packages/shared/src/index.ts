@@ -26,6 +26,9 @@ export const FACTION_NAMES = {
 export type FactionId = keyof typeof FACTION_NAMES;
 export const FACTION_IDS: readonly FactionId[] = Object.keys(FACTION_NAMES) as FactionId[];
 const factionId = z.enum(FACTION_IDS);
+export const ALLY_SERIES = ['A', 'B', 'C', 'D'] as const;
+export const allySeriesLetter = z.enum(ALLY_SERIES);
+export type AllySeries = z.infer<typeof allySeriesLetter>;
 
 export const createInput = z.strictObject({ name: playerName });
 export const joinInput = createInput.extend({ code: roomCode });
@@ -39,10 +42,13 @@ const factionInput = z.strictObject({
 const firstPlayerInput = z.strictObject({
   actionId: id, type: z.literal('select-first-player'), firstPlayerId: id, expectedRevision: z.int().nonnegative(),
 });
+const allySeriesInput = z.strictObject({
+  actionId: id, type: z.literal('select-ally-series'), allySeries: allySeriesLetter, expectedRevision: z.int().nonnegative(),
+});
 const launchInput = z.strictObject({
   actionId: id, type: z.literal('launch-preparation'), expectedRevision: z.int().nonnegative(),
 });
-export const lobbyAction = z.discriminatedUnion('type', [readyInput, factionInput, firstPlayerInput, launchInput]);
+export const lobbyAction = z.discriminatedUnion('type', [readyInput, factionInput, firstPlayerInput, allySeriesInput, launchInput]);
 const launchBlockerCodes = ['player-count', 'factions-incomplete', 'players-not-ready', 'first-player-required'] as const;
 export type LaunchBlocker = (typeof launchBlockerCodes)[number];
 export const errorCodes = [
@@ -112,15 +118,20 @@ export function preparationBlockers({ players, firstPlayerId }: Pick<LobbyStateV
   return blockers;
 }
 
-const lobbyEvent = z.discriminatedUnion('type', [
+const lobbyEvents = [
   ...eventsV3,
   z.strictObject({ revision: z.int().positive(), type: z.literal('launch-preparation'), actorId: id }),
-]);
+] as const;
+export const lobbyJournal = z.array(z.discriminatedUnion('type', [
+  ...lobbyEvents,
+  z.strictObject({ revision: z.int().positive(), type: z.literal('select-ally-series'), actorId: id, allySeries: allySeriesLetter }),
+])).max(JOURNAL_LIMIT);
+type LobbyJournal = z.infer<typeof lobbyJournal>;
 const lobbyWithGame = lobbyWithFactions.omit({ version: true }).extend({
   firstPlayerId: id.nullable(), game: gameState.nullable(),
-  journal: z.array(lobbyEvent).max(JOURNAL_LIMIT),
+  journal: z.array(z.discriminatedUnion('type', lobbyEvents)).max(JOURNAL_LIMIT),
 });
-function validPreparation(state: z.infer<typeof lobbyWithGame>) {
+function validPreparation(state: Omit<z.infer<typeof lobbyWithGame>, 'journal'> & { journal: LobbyJournal }) {
   const { players, hostId, game, journal, revision } = state;
   const seats = new Set(players.map(({ id }) => id));
   if (seats.size !== players.length || !seats.has(hostId)) return false;
@@ -145,7 +156,7 @@ export const lobbySnapshotV4 = lobbyWithGame.extend({
 export type LobbySnapshotV4 = z.infer<typeof lobbySnapshotV4>;
 
 export const lobbyWithScores = lobbyWithGame.extend({ regionScores: initialRegionScores.nullable() });
-export function validPreparationWithScores(state: z.infer<typeof lobbyWithScores>) {
+export function validPreparationWithScores(state: Omit<z.infer<typeof lobbyWithScores>, 'journal'> & { journal: LobbyJournal }) {
   return factionsAreUnique(state) && validPreparation(state) && (state.game === null) === (state.regionScores === null);
 }
 export function validInitialPreparation(state: z.infer<typeof lobbyWithScores>) {
@@ -198,10 +209,13 @@ export type InitialQuestView = { gameId: string } & (
   | { type: 'offer'; revision: 0; decisionId: string; cards: (QuestTextView & { optionId: string })[] }
   | { type: 'kept'; revision: 1; card: QuestTextView }
 );
-export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players' | 'journal'> & {
+export type LobbyView = Pick<z.infer<typeof lobbyWithGame>, 'code' | 'hostId' | 'revision' | 'firstPlayerId' | 'players'> & {
+  journal: LobbyJournal;
   you: string;
   canSetReady: boolean;
   canSelectFirstPlayer: boolean;
+  allySeries: AllySeries | null;
+  canSelectAllySeries: boolean;
   launch: { blockers: LaunchBlocker[] } | null;
   preparation: {
     gameId: string;
