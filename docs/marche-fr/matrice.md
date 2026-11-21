@@ -14,7 +14,7 @@ Les IDs `Mxx`, `V-Ax/Bx` et `O-Ax/Bx` sont des repères documentaires, pas des I
 
 | ID | Nom FR et nature de la preuve | Catégorie et indice | Pièce(s), repère et force du lien | 2J |
 |---|---|---|---|---|
-| M01 | **Lapin blanc** : titre du recto [p. 3][p3], devant l’éventail à gauche ; mention [p. 23][p23]. Un bord de carte derrière le Lapin est masqué et non identifiable. | Habitant, nommé sous ce sous-titre [p. 8][p8] avec détail du bas de carte et portrait inférieur droit. | Une silhouette figurée dans le groupe (V-A5), concordante avec le portrait désigné p. 8 ; lien par texte et motif. La petite icône du recto n’est pas une seconde pièce. | Non cité |
+| M01 | **Lapin blanc** : titre du recto [p. 3][p3], devant l’éventail à gauche ; mention [p. 23][p23]. Le recto derrière le Lapin est masqué : son titre n’est pas lisible sur le rendu (voir l’indice textuel M10). | Habitant, nommé sous ce sous-titre [p. 8][p8] avec détail du bas de carte et portrait inférieur droit. | Une silhouette figurée dans le groupe (V-A5), concordante avec le portrait désigné p. 8 ; lien par texte et motif. La petite icône du recto n’est pas une seconde pièce. | Non cité |
 | M02 | **Nœud papillon de Tweedle** : titre lu sur le premier recto en haut à gauche de la diagonale du marché [p. 4][p4], sous l’ombre ; corroboré par la vue de la fiche (rangée en bas à gauche, premier recto). | Objet : nœud centré en bas et équipement en scène. | Deux jetons distincts **dessinés en surimpression** sur le côté droit, dont un sous l’ombre ; le rond centré en bas est le repère sur le recto. Association en scène et motif O-A2 ; aucune paire physique contrôlée. | Non cité |
 | M03 | **Morse** : recto du milieu [p. 4][p4], en partie couvert par la pièce et le badge 4 ; titre confirmé [p. 17][p17], en bas à droite (cartouche recouvrant le côté droit du recto, dont le coin inférieur). Mention [p. 23][p23]. | Habitant : silhouette en scène p. 4 et nom de la pièce dans le bloc du Jabberwocky [p. 16][p16]. | Une silhouette illustrée sur le recto p. 4. Même chapeau et tête que V-A3 et que la silhouette explicitement nommée p. 16 (à côté du Château) ; l’image p. 17 n’ajoute pas d’exemplaire. | Non cité |
 | M04 | **Valet de cœur** : troisième recto [p. 4][p4], au-dessus du badge 5 (titre lisible, perspective, pièce devant le bord inférieur) ; mention [p. 23][p23]. | Habitant : portrait inférieur droit et silhouette en scène p. 4. | Une silhouette illustrée sur le recto p. 4 ; concordance avec V-B6. Ne pas confondre avec la carte Allié « Carte soldat » dans la rangée voisine. | Non cité |
@@ -23,7 +23,7 @@ Les IDs `Mxx`, `V-Ax/Bx` et `O-Ax/Bx` sont des repères documentaires, pas des I
 | M07 | **Amulette de la Duchesse** : nom de carte dans l’encadré [p. 21][p21], repris [p. 23][p23] à côté du jeton ; pas de recto. | Objet : jeton illustré sous le même nom, concordant avec le groupe Objet p. 3. | Lien explicite entre le nom et un jeton illustré p. 23, motif O-A1. Deux jetons attendus selon la règle générale ; pas de paire montrée ou contrôlée pour cette carte. | À exclure, p. 21 |
 | M08 | **Lièvre de Mars** : nom de carte dans l’encadré [p. 21][p21] ; graphie « Lièvre de mars » [p. 23][p23]. Pas de recto. | Non confirmée sur recto. | Pas de silhouette appariée dans ces passages, quantité par carte non vérifiée (voir [E03](controle.md#registre-des-lacunes-et-divergences)). | À exclure, p. 21 |
 | M09 | **Chenille** : mention [p. 23][p23], première entrée de la colonne gauche. | Non confirmée. | Aucune pièce rattachée, nombre inconnu. | Non cité |
-| M10 | **Duchesse** : mention [p. 23][p23], après Chenille. | Indice textuel d’Habitant (unité pouvant être perdue, cf. [p. 13][p13]), pas de recto lisible. | Aucune pièce rattachée, nombre inconnu ; distincte de M07. | Non cité |
+| M10 | **Duchesse** : mention [p. 23][p23], après Chenille. La couche texte de la [p. 3][p3] contient « DUCHESSE » dans la zone du recto masqué derrière le Lapin blanc (M01) : indice seulement, pas un titre lu sur le rendu. | Indice textuel d’Habitant (unité pouvant être perdue, cf. [p. 13][p13]), pas de recto lisible. | Aucune pièce rattachée, nombre inconnu ; distincte de M07. | Non cité |
 | M11 | **Licorne** : mention [p. 23][p23], entrée commune avec M12, entre Lapin blanc et Lièvre. | Non confirmée. | Aucune pièce rattachée, nombre inconnu ; la ressemblance avec une silhouette p. 3 ne constitue pas un appariement. | Non cité |
 | M12 | **Crin de la Licorne** : autre nom dans l’entrée commune [p. 23][p23]. | Non confirmée. | Aucune pièce rattachée, nombre inconnu. | Non cité |
 | M13 | **Couronne du Valet** : mention [p. 23][p23], sous Amulette. | Non confirmée. | Aucune pièce rattachée, nombre inconnu ; un motif en forme de couronne n’identifie pas le titre du recto. | Non cité |
@@ -36,7 +36,7 @@ Les IDs `Mxx`, `V-Ax/Bx` et `O-Ax/Bx` sont des repères documentaires, pas des I
 
 | ID | Bande et position p. 3 | Silhouette reconnaissable | Nom attesté / recoupement |
 |---|---|---|---|
-| V-A1 | Arrière 1 | Petite figure brune au bord gauche, derrière le haut-de-forme du Chef | Inconnu ; revue en scène [p. 18][p18], vignette sous « Astuce », à droite du Chat |
+| V-A1 | Arrière 1 | Petite figure brune au bord gauche, derrière le haut-de-forme du Chef | Inconnu ; revue en scène [p. 18][p18], vignette au-dessus d’« Astuce », à droite du Chat |
 | V-A2 | Arrière 2 | Figure bleue sous les volutes vertes, derrière V-B1 | Inconnu |
 | V-A3 | Arrière 3 | Haut-de-forme noir, moustaches et défenses | Morse : M03, [p. 16][p16] et [p. 4][p4] |
 | V-A4 | Arrière 4 | Ornement violet à plusieurs lobes, derrière V-B3 | Inconnu |
@@ -45,7 +45,7 @@ Les IDs `Mxx`, `V-Ax/Bx` et `O-Ax/Bx` sont des repères documentaires, pas des I
 | V-A7 | Arrière 7 | Figure rouge et sombre derrière V-B6 | Inconnu |
 | V-B1 | Intermédiaire 1 | Tête claire à corne, crinière bleu-violet, devant V-A2 | Inconnu |
 | V-B2 | Intermédiaire 2 | Oreilles roses au-dessus de la Reine, devant V-A2 | Inconnu |
-| V-B3 | Intermédiaire 3 | Figure ovale claire, en dessous et à gauche de V-A4 | Inconnu ; revue en scène [p. 18][p18], vignette sous « Astuce », à gauche |
+| V-B3 | Intermédiaire 3 | Figure ovale claire, en dessous et à gauche de V-A4 | Inconnu ; revue en scène [p. 18][p18], vignette au-dessus d’« Astuce », à gauche |
 | V-B4 | Intermédiaire 4 | Visage rond grisé au nœud rouge, devant V-A5 | Inconnu ; ne pas l’apparier à V-A6 ou à une carte par défaut |
 | V-B5 | Intermédiaire 5 | Aile brune tournée vers la droite, entre V-B4 et V-A6, base masquée | Griffon : M06, silhouette nommée [p. 18][p18] |
 | V-B6 | Intermédiaire 6 | Figure rouge et or au premier plan du côté droit, sous V-A7 | Valet de cœur : M04, sur le recto nommé [p. 4][p4] |
