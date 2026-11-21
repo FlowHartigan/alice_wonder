@@ -1,5 +1,6 @@
 import { gameState } from '@wonderland/shared';
 import type { GamePhase } from '@wonderland/shared';
+import { INITIAL_SHARD_BANK } from '@wonderland/shared/lobby-storage';
 import { firstTeaForSetup } from './game.ts';
 
 /** Counts of physical pieces, indexed by denomination. */
@@ -25,7 +26,6 @@ type ResolvedStartingShards = Readonly<{
 }>;
 
 const pieces = (ones: number, fives: number): ShardPieces => Object.freeze({ 1: ones, 5: fives });
-const initialBank = pieces(30, 10);
 
 /** WW-SETUP-005, round I, step N. Replay accepts only the already acquired engine result. */
 export function transferStartingShards(state: PendingStartingShards | ResolvedStartingShards): ResolvedStartingShards | null {
@@ -41,11 +41,11 @@ export function transferStartingShards(state: PendingStartingShards | ResolvedSt
   return Object.freeze({
     status: 'resolved',
     before: Object.freeze({
-      bank: initialBank,
+      bank: INITIAL_SHARD_BANK,
       balances: Object.freeze(order.map(({ playerId }) => Object.freeze({ playerId, pieces: pieces(0, 0) }))),
     }),
     after: Object.freeze({
-      bank: pieces(initialBank[1] - spent, initialBank[5]),
+      bank: pieces(INITIAL_SHARD_BANK[1] - spent, INITIAL_SHARD_BANK[5]),
       balances: Object.freeze(order.map(({ playerId, plannedShards }) => Object.freeze({ playerId, pieces: pieces(plannedShards, 0) }))),
     }),
   });

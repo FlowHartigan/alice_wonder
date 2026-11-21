@@ -2,8 +2,10 @@ import { z } from 'zod';
 import { lobbyWithScores, validInitialPreparation, validPreparationWithScores } from './index.ts';
 import { initialQuestsSnapshot, matchesInitialQuests } from './initial-quests.ts';
 import { initialResourcesSnapshot, matchesStartingSeat, startingSeatResources } from './initial-resources.ts';
+import { centralReservesSnapshot, countInitialCentralReserves } from './central-reserves.ts';
 import { twoPlayerSetupSnapshot } from './setup-quests-v1.ts';
 
+export { countInitialCentralReserves, INITIAL_SHARD_BANK } from './central-reserves.ts';
 export { STARTING_TOKEN_TYPES, startingSeatResources } from './initial-resources.ts';
 export type { InitialResourcesSnapshot } from './initial-resources.ts';
 export * from './setup-quests-v1.ts';
@@ -54,8 +56,8 @@ function matchesFirstPlayer({ firstPlayerId, players }: Pick<LobbySnapshotV8, 'f
   return firstPlayerId === null || players.some(({ id }) => id === firstPlayerId);
 }
 
-export const lobbyState = lobbyWithScores.extend({
-  version: z.literal(9), firstBattleRoll: firstBattleRoll.nullable(),
+const lobbyWithInitialQuests = lobbyWithScores.extend({
+  firstBattleRoll: firstBattleRoll.nullable(),
   individualResources: initialResourcesSnapshot.nullable(), initialQuests: initialQuestsSnapshot.nullable(),
 }).refine(validPreparationWithScores, 'Sièges ou état de préparation incohérents')
   .refine(matchesFirstPlayer, { message: 'Le premier joueur doit avoir un siège dans le salon', path: ['firstPlayerId'] })
@@ -65,4 +67,16 @@ export const lobbyState = lobbyWithScores.extend({
   .refine(({ game, initialQuests }) => matchesInitialQuests(game, initialQuests), {
     message: 'Zones ou décisions de Quêtes initiales incohérentes', path: ['initialQuests'],
   });
+export const lobbySnapshotV9 = lobbyWithInitialQuests.safeExtend({ version: z.literal(9) });
+export type LobbySnapshotV9 = z.infer<typeof lobbySnapshotV9>;
+
+export const lobbyState = lobbyWithInitialQuests.safeExtend({
+  version: z.literal(10), centralReserves: centralReservesSnapshot.nullable(),
+}).refine(({ individualResources, centralReserves }) => {
+  // Other refinements already bind each whole bag to its unique frozen seat and the setup phase.
+  if (!individualResources) return centralReserves === null;
+  const { undistributedMadness } = countInitialCentralReserves(individualResources);
+  return centralReserves !== null && centralReserves.undistributedMadness.single === undistributedMadness.single
+    && centralReserves.undistributedMadness.double === undistributedMadness.double;
+}, { message: 'Réserves centrales incohérentes avec les sacs ou la phase', path: ['centralReserves'] });
 export type LobbyState = z.infer<typeof lobbyState>;
