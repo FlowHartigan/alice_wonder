@@ -1,0 +1,274 @@
+{
+  "id": "the-i-livret-fr",
+  "statut": "Inventaire documentaire non exécutable d’illustrations, pas d’exemplaires physiques",
+  "source": "livret-fr",
+  "manifestVisuels": "visuels.json",
+  "catalogueComparaison": "the-i.json",
+  "quantitesParMotifFr": null,
+  "motifsComplets": [
+    {
+      "id": "fr-rose-quete",
+      "preuve": "recto-lisible",
+      "correspondance": "exacte",
+      "definition": "the-i-29409",
+      "illustrations": [{"page": 3, "repere": "Matériel, miniature bleue I à gauche des trois cartes Thé"}]
+    },
+    {
+      "id": "fr-rose-defausse",
+      "preuve": "recto-lisible-en-scene",
+      "correspondance": "exacte",
+      "definition": "the-i-29413",
+      "illustrations": [{"page": 4, "repere": "Table, recto bleu à gauche de la carte aux deux Tours rouges, en haut près du repère vert I"}]
+    },
+    {
+      "id": "fr-deux-tours-rouges",
+      "preuve": "recto-lisible-en-scene",
+      "correspondance": "exacte",
+      "definition": "the-i-29401",
+      "illustrations": [{"page": 4, "repere": "Table, recto bleu juste à gauche du repère vert I, au-dessus du recto gris"}]
+    },
+    {
+      "id": "fr-deux-soldats",
+      "preuve": "recto-lisible-en-scene",
+      "correspondance": "exacte",
+      "definition": "the-i-29400",
+      "illustrations": [
+        {"page": 4, "repere": "Table, premier recto bleu sous le recto gris le long de la piste 43–44"},
+        {"page": 4, "repere": "Table, second recto bleu sous le recto gris, juste avant les deux chaises bloquées"},
+        {"page": 4, "repere": "Table, recto bleu le plus bas, à gauche du repère vert M"}
+      ]
+    },
+    {
+      "id": "fr-forge-force-defausse",
+      "preuve": "recto-lisible-en-scene",
+      "correspondance": "exacte",
+      "definition": "the-i-29415",
+      "illustrations": [{"page": 4, "repere": "Table, recto bleu à gauche de la réserve d’Éclats, au-dessus de la zone assombrie"}]
+    },
+    {
+      "id": "fr-tour-rouge-defausse",
+      "preuve": "recto-lisible",
+      "correspondance": "exacte",
+      "definition": "the-i-29414",
+      "illustrations": [{"page": 7, "repere": "Gagner une carte, recto agrandi dans la vignette B"}]
+    },
+    {
+      "id": "fr-divisee-marche-capacite",
+      "preuve": "recto-lisible",
+      "correspondance": "exacte",
+      "definition": "the-i-29420",
+      "illustrations": [{"page": 9, "repere": "Carte divisée, recto incliné de la colonne de gauche"}]
+    },
+    {
+      "id": "fr-corrompue-marche-allie",
+      "preuve": "recto-lisible",
+      "correspondance": "exacte",
+      "definition": "the-i-marche-de-allie-faible",
+      "illustrations": [{"page": 9, "repere": "Carte corrompue, recto gris de la colonne du milieu", "visuel": "livret-the-i-corrompue"}]
+    },
+    {
+      "id": "fr-soldat-quete",
+      "preuve": "recto-lisible-en-scene",
+      "correspondance": "exacte",
+      "definition": "the-i-29405",
+      "illustrations": [
+        {"page": 10, "repere": "Jabberwocky, vignette 2, carte vers laquelle pointe la flèche blanche"},
+        {"page": 10, "repere": "Chapelier fou, vignette 1, recto en haut à droite"},
+        {"page": 10, "repere": "Chapelier fou, vignette 2, recto soulevé à droite de la Reine"}
+      ]
+    },
+    {
+      "id": "fr-deux-roses",
+      "preuve": "recto-lisible",
+      "correspondance": "exacte",
+      "definition": "the-i-29404",
+      "illustrations": [{"page": 11, "repere": "Reine de cœur, recto agrandi dans la vignette 1"}]
+    },
+    {
+      "id": "fr-creature-defausse",
+      "preuve": "recto-lisible",
+      "correspondance": "exacte",
+      "definition": "the-i-29411",
+      "illustrations": [{"page": 21, "repere": "Thé pour deux, recto incliné au bas de la colonne de gauche"}]
+    }
+  ],
+  "observationsPartielles": [
+    {
+      "id": "fr-p4-corrompue-capacite",
+      "preuve": "lecture-incertaine",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-capacite-de-unites",
+      "illustrations": [{"page": 4, "repere": "Table, recto gris entre les deux Tours rouges et les premiers Soldats"}],
+      "groupesVisibles": {"commun": ["Affectation (nombre incertain)", "Déblocage de capacité"], "siDeAccepte": ["Jet du dé Éclat", "Affectation supplémentaire (nombre incertain)"]},
+      "observation": "Les nombres ressemblent à des 2 ; cette vue ne certifie pas le marquage du recto (dont le repère I) ni les deux groupes chiffrés de L2C10. Le rapprochement ne vaut pas confirmation FR."
+    },
+    {
+      "id": "fr-p4-marche-allie",
+      "preuve": "scene-masquee",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-marche-de-allie-faible",
+      "illustrations": [{"page": 4, "repere": "Table, recto gris dans la zone assombrie, au-dessus et à gauche du repère bleu 8"}],
+      "groupesVisibles": {"commun": ["Accès au marché"], "siDeAccepte": ["Jet du dé Éclat", "Allié au choix (niveau non certifié sur cette vue)"]},
+      "observation": "Les coins assombris sont trop peu lisibles pour refaire la lecture de la p. 9 à partir de cette vue."
+    },
+    {
+      "id": "fr-p4-creature",
+      "preuve": "scene-masquee",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-29411",
+      "illustrations": [{"page": 4, "repere": "Table, recto bleu en partie sous le repère bleu 8"}],
+      "groupesVisibles": {"commun": ["Gain de Créature", "Éclat barré"]},
+      "observation": "Le repère 8 et l’ombre empêchent une lecture complète ; voir le recto isolé p. 21."
+    },
+    {
+      "id": "fr-p4-capacite-allie",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 4, "repere": "Table, premier recto bleu sous le repère 8"}],
+      "groupesVisibles": {"commun": ["Capacité", "Allié au choix", "Dé Éclat en coin"]},
+      "observation": "Le coin de l’affectation est masqué ; ne pas assimiler la carte à la définition 29424."
+    },
+    {
+      "id": "fr-divisee-en-scene",
+      "preuve": "scene-masquee",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-29420",
+      "illustrations": [
+        {"page": 4, "repere": "Table, recto divisé au-dessous du recto à capacité, près de la limite de l’ombre"},
+        {"page": 6, "repere": "Plateau, recto bleu sous le repère orange 1 du bas"}
+      ],
+      "groupesVisibles": {"haut": ["Accès au marché"], "bas": ["Déblocage de capacité"]},
+      "observation": "La séparation est visible ; ne pas tirer de ces vues la lecture complète des coins de la p. 9."
+    },
+    {
+      "id": "fr-p6-forge-de",
+      "preuve": "scene-masquee",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-29416",
+      "illustrations": [{"page": 6, "repere": "Plateau, recto bleu derrière le repère orange 1 du haut"}],
+      "groupesVisibles": {"commun": ["Gain de Forge", "Force du Chef", "Dé Éclat en coin"]},
+      "observation": "Le repère masque le bas et l’affectation n’est pas suffisamment lisible."
+    },
+    {
+      "id": "fr-p7-tour-en-scene",
+      "preuve": "scene-masquee",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-29414",
+      "illustrations": [{"page": 7, "repere": "Vignette A, carte ciblée par la flèche"}],
+      "groupesVisibles": {"commun": ["Gain de Tour rouge", "Éclat barré"]},
+      "observation": "La flèche recouvre le bord du recto ; voir la vue agrandie en B. Le fond de B est lui aussi masqué par l’agrandissement."
+    },
+    {
+      "id": "fr-p7-forge-force",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 7, "repere": "Vignette A, carte à droite de la flèche"}],
+      "groupesVisibles": {"commun": ["Gain de Forge", "Force du Chef"]},
+      "observation": "Coin masqué par la flèche ; ne pas choisir entre les variantes à partir des seuls symboles centraux."
+    },
+    {
+      "id": "fr-p7-flamant-quete",
+      "preuve": "scene-masquee",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-29408",
+      "illustrations": [{"page": 7, "repere": "Vignette C, recto au bord gauche de la scène"}],
+      "groupesVisibles": {"commun": ["Flamant rose", "Quête"]},
+      "observation": "Le cadre de la vignette rogne le recto."
+    },
+    {
+      "id": "fr-p7-remplissage-marche",
+      "preuve": "lecture-incertaine",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 7, "repere": "Vignette E, carte de gauche au-dessus des flèches de remplissage"}],
+      "groupesVisibles": {"commun": ["Accès au marché", "Affectation (nombre incertain)"]},
+      "observation": "Les coins sont trop petits pour certifier le groupe complet."
+    },
+    {
+      "id": "fr-p7-remplissage-soldat",
+      "preuve": "lecture-incertaine",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-29405",
+      "illustrations": [{"page": 7, "repere": "Vignette E, carte de droite au-dessus des flèches de remplissage"}],
+      "groupesVisibles": {"commun": ["Soldat", "Quête"]},
+      "observation": "Les coins sont trop petits pour certifier le groupe complet."
+    },
+    {
+      "id": "fr-p10-roses-en-scene",
+      "preuve": "lecture-incertaine",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-29404",
+      "illustrations": [
+        {"page": 10, "repere": "Chapelier fou, vignette 1, carte aux deux Roses devant le Chapelier"},
+        {"page": 10, "repere": "Chapelier fou, vignette 2, carte aux deux Roses devant le Chapelier"}
+      ],
+      "groupesVisibles": {"commun": ["Affectation : 2 unités", "Deux Roses", "Dé Éclat en coin"]},
+      "observation": "Le niveau des Roses est plus sûrement lisible sur le recto agrandi p. 11."
+    },
+    {
+      "id": "fr-p10-poison",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [
+        {"page": 10, "repere": "Jabberwocky, vignette 1, carte à gauche de la pioche"},
+        {"page": 10, "repere": "Jabberwocky, vignette 2, carte sous la flèche de pose du Poison"}
+      ],
+      "groupesVisibles": {"commun": ["Au moins un jeton Allié"]},
+      "observation": "Silhouette, jeton ou flèche masquent une partie des pictogrammes."
+    },
+    {
+      "id": "fr-p11-flamant-quete",
+      "preuve": "recto-partiel",
+      "correspondance": "partielle",
+      "definitionComparee": "the-i-29408",
+      "illustrations": [
+        {"page": 11, "repere": "Alice, carte à droite dans la vignette 1, en perspective au bord de la scène"},
+        {"page": 11, "repere": "Alice, recto agrandi dans la vignette 2, angle recouvert par le repère"}
+      ],
+      "groupesVisibles": {"commun": ["Affectation : 1 unité", "Gain : 1 Flamant rose faible", "Pioche : 1 Quête"]},
+      "observation": "Les pictogrammes visibles concordent ; le repère de l’illustration agrandie masque une partie du recto."
+    },
+    {
+      "id": "fr-p11-alice-de-coin",
+      "preuve": "lecture-incertaine",
+      "correspondance": "absente",
+      "definitionComparee": "the-i-29424",
+      "illustrations": [
+        {"page": 11, "repere": "Alice, vignette 2, carte bleue à droite du recto agrandi Flamant/Quête"}
+      ],
+      "groupesVisibles": {"commun": ["Affectation : 1 unité", "Dé Éclat en coin", "Déblocage de capacité", "Allié au choix (chiffre 1 dans le symbole)"]},
+      "observation": "Le symbole d’Allié porte un chiffre 1 au lieu du point de la légende p. 8. Aucune définition de #37 ne réunit ces pictogrammes visibles dans le groupe commun : 29424 n’a pas d’affectation. Ne pas compléter les parties peu lisibles ni assimiler cette vue à une carte grise à dé lié."
+    },
+    {
+      "id": "fr-p11-capacite-allie-en-scene-alice-1",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 11, "repere": "Alice, vignette 1, carte bleue sous la flèche"}],
+      "groupesVisibles": {"commun": ["Dé Éclat en coin (partiel)", "Symbole de capacité (partiel)", "Allié au choix"]},
+      "observation": "La flèche masque plusieurs zones du recto."
+    },
+    {
+      "id": "fr-p11-capacite-allie-en-scene-reine-2",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 11, "repere": "Reine de cœur, vignette 2, sur la table à droite de la silhouette"}],
+      "groupesVisibles": {"commun": ["Dé Éclat en coin", "Déblocage de capacité", "Allié au choix", "Affectation (nombre incertain)"]},
+      "observation": "La flèche coupe le bas de la carte ; le coin d’affectation est trop petit pour fixer le nombre."
+    },
+    {
+      "id": "fr-p11-capacite-allie-en-scene-chat-1",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 11, "repere": "Chat du Cheshire, vignette 1, carte ciblée"}],
+      "groupesVisibles": {"commun": ["Déblocage de capacité", "Dé Éclat en coin", "Portion du symbole Allié"]},
+      "observation": "La flèche recouvre une partie du symbole Allié."
+    },
+    {
+      "id": "fr-p11-capacite-allie-en-scene-chat-2",
+      "preuve": "scene-masquee",
+      "correspondance": "indeterminee",
+      "illustrations": [{"page": 11, "repere": "Chat du Cheshire, vignette 2, carte occupée par le Chat"}],
+      "groupesVisibles": {"commun": ["Portion du symbole multicolore Allié"]},
+      "observation": "La silhouette cache le reste du recto."
+    }
+  ]
+}
