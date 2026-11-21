@@ -98,16 +98,21 @@ it.each([
     if (!result.ok) throw new Error(result.error);
     return lobbyState.parse(result.value);
   };
-  const launched = run(() => 0);
+  const random = vi.fn(() => 0);
+  const launched = run(random);
+  expect(random).toHaveBeenCalledTimes(5 + 29 + 1 + count * (bagTokenCount - 1));
   expect(run(() => 0)).toEqual(launched);
   expect(state.individualResources).toBeNull();
   expect(state.centralReserves).toBeNull();
-  expect(launched.centralReserves).toEqual({
-    undistributedMadness: { single: 29 - 2 * count, double: 5 - count }, shardBank: { 1: 30, 5: 10 },
-  });
+  const { forgeReserve, otherAllyTotals, ...central } = launched.centralReserves!;
+  expect(central).toEqual({ undistributedMadness: { single: 29 - 2 * count, double: 5 - count }, shardBank: { 1: 30, 5: 10 } });
+  expect(otherAllyTotals).toStrictEqual({ flamingo: 19, creature: 19, redTower: 19, rose: 19, cardSoldier: 19 });
+  expect(forgeReserve).toHaveLength([21, 22, 21, 20][count - 2]);
+  expect(forgeReserve.map(({ type }) => type)).toEqual(Array(forgeReserve.length).fill('forge-1'));
   expect({ ...launched.game, decisions: [] }).toEqual(initializeGame(gameId, players.map(({ id }) => id)));
   expect(launched.game?.decisions).toHaveLength(count);
-  const allIds: string[] = [];
+  const allIds = forgeReserve.map(({ id }) => id);
+  let bagForge = 0;
   for (const [i, seat] of launched.individualResources!.entries()) {
     const { tokenZones, ...holdings } = seat;
     const { id: playerId, faction } = players[i];
@@ -117,6 +122,7 @@ it.each([
     });
     const { bag, forgeRewards, poisonReserve, active, exhausted, madnessTrack } = tokenZones;
     expect(bag).toHaveLength(bagTokenCount);
+    bagForge += bag.filter(({ type }) => type === 'forge-1').length;
     expect(bag.map(({ type }) => type).sort()).toEqual([
       'artifact-3', 'artifact-3', ...(count === 2 ? ['forge-1'] : []), 'forge-1',
       'leader-1', 'leader-1', 'leader-1', 'leader-2', 'madness-double', 'madness-single', 'madness-single',
@@ -129,6 +135,7 @@ it.each([
     for (const zone of Object.values(tokenZones)) allIds.push(...zone.map(({ id }) => id));
   }
   expect(new Set(allIds).size).toBe(allIds.length);
+  expect(bagForge + forgeReserve.length).toBe(25);
   expect(STARTING_TOKEN_TYPES).toEqual({
     'leader-1': { kind: 'leader', strength: 1 }, 'leader-2': { kind: 'leader', strength: 2 },
     'artifact-3': { kind: 'artifact', strength: 3 }, 'forge-1': { kind: 'forge', strength: 1 },

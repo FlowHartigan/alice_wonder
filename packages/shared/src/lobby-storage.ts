@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { lobbyWithScores, validInitialPreparation, validPreparationWithScores } from './index.ts';
 import { initialQuestsSnapshot, matchesInitialQuests } from './initial-quests.ts';
 import { initialResourcesSnapshot, matchesStartingSeat, startingSeatResources } from './initial-resources.ts';
-import { centralReservesSnapshot, countInitialCentralReserves } from './central-reserves.ts';
+import { centralReservesSnapshot, centralReservesSnapshotV10, countInitialCentralReserves, matchesForgeReserve } from './central-reserves.ts';
 import { twoPlayerSetupSnapshot } from './setup-quests-v1.ts';
 
-export { countInitialCentralReserves, INITIAL_SHARD_BANK } from './central-reserves.ts';
+export { countInitialCentralReserves, initialAllyStock, INITIAL_SHARD_BANK } from './central-reserves.ts';
 export { STARTING_TOKEN_TYPES, startingSeatResources } from './initial-resources.ts';
 export type { InitialResourcesSnapshot } from './initial-resources.ts';
 export * from './setup-quests-v1.ts';
@@ -70,13 +70,21 @@ const lobbyWithInitialQuests = lobbyWithScores.extend({
 export const lobbySnapshotV9 = lobbyWithInitialQuests.safeExtend({ version: z.literal(9) });
 export type LobbySnapshotV9 = z.infer<typeof lobbySnapshotV9>;
 
-export const lobbyState = lobbyWithInitialQuests.safeExtend({
-  version: z.literal(10), centralReserves: centralReservesSnapshot.nullable(),
+const reservesError = { message: 'Réserves centrales incohérentes avec les sacs ou la phase', path: ['centralReserves'] };
+const lobbyWithCentralReserves = lobbyWithInitialQuests.safeExtend({
+  centralReserves: centralReservesSnapshotV10.nullable(),
 }).refine(({ individualResources, centralReserves }) => {
   // Other refinements already bind each whole bag to its unique frozen seat and the setup phase.
   if (!individualResources) return centralReserves === null;
   const { undistributedMadness } = countInitialCentralReserves(individualResources);
   return centralReserves !== null && centralReserves.undistributedMadness.single === undistributedMadness.single
     && centralReserves.undistributedMadness.double === undistributedMadness.double;
-}, { message: 'Réserves centrales incohérentes avec les sacs ou la phase', path: ['centralReserves'] });
+}, reservesError);
+export const lobbySnapshotV10 = lobbyWithCentralReserves.safeExtend({ version: z.literal(10) });
+export type LobbySnapshotV10 = z.infer<typeof lobbySnapshotV10>;
+
+export const lobbyState = lobbyWithCentralReserves.safeExtend({
+  version: z.literal(11), centralReserves: centralReservesSnapshot.nullable(),
+}).refine(({ individualResources, centralReserves }) => !individualResources || (centralReserves !== null
+  && matchesForgeReserve(individualResources, centralReserves.forgeReserve)), reservesError);
 export type LobbyState = z.infer<typeof lobbyState>;
