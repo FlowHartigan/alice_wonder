@@ -1,10 +1,10 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
-import { createLobby, joinLobby, applyLobbyAction, chooseInitialQuest, initialQuestFor, isReadyForSetupK, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, migrateLobbyV5, migrateLobbyV6, migrateLobbyV7, migrateLobbyV8, migrateLobbyV9 } from '@wonderland/game-engine';
+import { createLobby, joinLobby, applyLobbyAction, chooseInitialQuest, initialQuestFor, isReadyForSetupK, launchPreparation, migrateLobbyV1, migrateLobbyV2, migrateLobbyV3, migrateLobbyV4, migrateLobbyV5, migrateLobbyV6, migrateLobbyV7, migrateLobbyV8, migrateLobbyV9, migrateLobbyV10 } from '@wonderland/game-engine';
 import type { RandomSource } from '@wonderland/game-engine';
 import { lobbySnapshotV5, lobbySnapshotV4, lobbyStateV1, lobbyStateV2, lobbyStateV3 } from '@wonderland/shared';
 import type { GameAction, GameReceipt, InitialQuestView, LobbyAction, Reply, Session } from '@wonderland/shared';
-import { lobbySnapshotV6, lobbySnapshotV7, lobbySnapshotV8, lobbySnapshotV9, lobbyState } from '@wonderland/shared/lobby-storage';
+import { lobbySnapshotV6, lobbySnapshotV7, lobbySnapshotV8, lobbySnapshotV9, lobbySnapshotV10, lobbyState } from '@wonderland/shared/lobby-storage';
 import type { LobbyState } from '@wonderland/shared/lobby-storage';
 
 export type Seat = { code: string; playerId: string };
@@ -42,7 +42,7 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
     }
   }
 
-  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10) {
+  function restoreSnapshots(version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11) {
     const rows = db.prepare('SELECT code, snapshot FROM lobbies').all();
     for (const row of rows) {
       const raw: unknown = JSON.parse(String(row.snapshot));
@@ -81,10 +81,14 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       } else if (version === 9) {
         const old = lobbySnapshotV9.parse(raw);
         if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v9');
-        save(migrateLobbyV9(old));
+        writeSnapshot(lobbySnapshotV10.parse(migrateLobbyV9(old)));
+      } else if (version === 10) {
+        const old = lobbySnapshotV10.parse(raw);
+        if (old.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v10');
+        save(migrateLobbyV10(old));
       } else {
         const snapshot = lobbyState.parse(raw);
-        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v10');
+        if (snapshot.code !== row.code) throw new Error('Code du salon incohérent dans le snapshot v11');
       }
     }
   }
@@ -93,7 +97,7 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
     db.exec('PRAGMA busy_timeout = 5000');
     transaction(() => {
       const version = db.prepare('PRAGMA user_version').get()?.user_version;
-      if (typeof version !== 'number' || !Number.isInteger(version) || version < 0 || version > 10) {
+      if (typeof version !== 'number' || !Number.isInteger(version) || version < 0 || version > 11) {
         throw new Error('Version de base non prise en charge');
       }
       if (version === 0) db.exec(migration1);
@@ -105,11 +109,12 @@ export function openStore(path: string, random: RandomSource = randomFraction) {
       if (version <= 6) restoreSnapshots(6);
       if (version <= 7) restoreSnapshots(7);
       if (version <= 8) restoreSnapshots(8);
-      if (version <= 9) {
-        restoreSnapshots(9);
+      if (version <= 9) restoreSnapshots(9);
+      if (version <= 10) {
+        restoreSnapshots(10);
         // Preserve sessions and successful action fingerprints through all steps.
-        db.exec('PRAGMA user_version = 10');
-      } else restoreSnapshots(10);
+        db.exec('PRAGMA user_version = 11');
+      } else restoreSnapshots(11);
     });
   } catch (error) {
     db.close();

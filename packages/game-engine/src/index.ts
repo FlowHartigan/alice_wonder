@@ -1,7 +1,7 @@
 import { FACTION_IDS, JOURNAL_LIMIT, MAX_PLAYERS, REGION_CATALOG, REGION_SCORE_MARKER_CATALOG, initialRegionScores, preparationBlockers } from '@wonderland/shared';
 import type { InitialLeadersSetupView, LobbyAction, LobbySnapshotV4, LobbySnapshotV5, LobbyStateV1, LobbyStateV2, LobbyStateV3, LobbyView, RegionId, Reply } from '@wonderland/shared';
-import { countInitialCentralReserves, SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
-import type { LobbySnapshotV6, LobbySnapshotV7, LobbySnapshotV8, LobbySnapshotV9, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
+import { countInitialCentralReserves, initialAllyStock, SETUP_QUEST_CATALOG_V1, getSetupQuestV1 } from '@wonderland/shared/lobby-storage';
+import type { LobbySnapshotV6, LobbySnapshotV7, LobbySnapshotV8, LobbySnapshotV9, LobbySnapshotV10, LobbyState, TwoPlayerSetupSnapshot } from '@wonderland/shared/lobby-storage';
 import { resolveFirstBattleRegion, rollFirstBattleDie } from './first-battle-region.ts';
 import { firstTeaForSetup, initializeGame, teaTableForSetup } from './game.ts';
 import type { RandomSource } from './game.ts';
@@ -22,7 +22,7 @@ type NewPlayer = Pick<LobbyState['players'][number], 'id' | 'name'>;
 
 export function createLobby(code: string, host: NewPlayer): LobbyState {
   return {
-    version: 10, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null,
+    version: 11, code, hostId: host.id, revision: 1, firstPlayerId: null, game: null, regionScores: null,
     firstBattleRoll: null, individualResources: null, initialQuests: null, centralReserves: null,
     players: [{ ...host, ready: false, faction: null }],
     journal: [{ revision: 1, type: 'joined', actorId: host.id }],
@@ -99,9 +99,17 @@ export function migrateLobbyV8({ twoPlayerSetup, ...old }: LobbySnapshotV8, rand
 }
 
 /** Receives a validated v9 snapshot, before or after J. Only step 6 is backfilled. */
-export function migrateLobbyV9(old: LobbySnapshotV9): LobbyState {
+export function migrateLobbyV9(old: LobbySnapshotV9): LobbySnapshotV10 {
   return { ...old, version: 10,
     centralReserves: old.individualResources ? countInitialCentralReserves(old.individualResources) : null,
+  };
+}
+
+/** Backfill only Ally stock on a validated v10 snapshot; no replay or RNG. */
+export function migrateLobbyV10(old: LobbySnapshotV10): LobbyState {
+  const { centralReserves, individualResources } = old;
+  return { ...old, version: 11,
+    centralReserves: centralReserves && individualResources ? { ...centralReserves, ...initialAllyStock(individualResources) } : null,
   };
 }
 
@@ -139,7 +147,7 @@ export function launchPreparation(
   const supply = questSupply(shuffleSetupQuestIds(random), game.playerIds.length, regionScores);
   const firstBattleRoll = rollFirstBattleDie(random);
   const individualResources = distributeInitialResources(state.players, random);
-  const centralReserves = countInitialCentralReserves(individualResources);
+  const centralReserves = { ...countInitialCentralReserves(individualResources), ...initialAllyStock(individualResources) };
   const quests = dealInitialQuests(game, supply);
   return { ok: true, value: advance({ ...state, ...quests, regionScores, firstBattleRoll, individualResources, centralReserves },
     { revision: state.revision + 1, type: 'launch-preparation', actorId }) };
